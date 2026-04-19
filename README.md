@@ -39,6 +39,7 @@ elder_monitor_system/
 
 - Python 3.8+
 - Windows/Linux 操作系统
+- 修改测试，gitee上传功能
 
 ## 安装依赖
 
