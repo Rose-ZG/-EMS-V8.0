@@ -20,9 +20,11 @@ class HardwareManager:
                 return True
             except Exception as e:
                 print(f"[HW] 信号发送失败: {e}")
+                self.available = False
                 return False
         return False
 
     def close(self):
-        if self.ser:
+        if self.ser and self.ser.is_open:
             self.ser.close()
+            self.available = False
