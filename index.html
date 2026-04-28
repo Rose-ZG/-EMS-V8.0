@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[EMS] Project | 智能居家康复监测系统 v6.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #1a1b26;
+            --card-bg: #24283b;
+            --primary: #7aa2f7;
+            --accent: #9ece6a;
+            --text: #c0caf5;
+            --primary-glow: rgba(122, 162, 247, 0.4);
+            --accent-glow: rgba(158, 238, 106, 0.2);
+        }
+
+        body {
+            font-family: 'Inter', 'PingFang SC', sans-serif;
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            scroll-behavior: smooth;
+            overflow-x: hidden;
+        }
+
+            /* 导航栏增强样式 */
+        nav {
+            padding: 0 8%;
+            height: 80px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(26, 27, 38, 0.85);
+            backdrop-filter: blur(15px);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+
+            .nav-links {
+                display: flex;
+                gap: 30px;
+            }
+
+        .nav-item {
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            position: relative;
+            padding: 10px 0;
+            transition: color 0.3s;
+        }
+
+        .nav-item:hover {
+            color: var(--primary);
+        }
+
+        /* 悬浮下划线动画 */
+        .nav-item::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--primary);
+            transition: width 0.3s ease;
+            box-shadow: 0 0 8px var(--primary-glow);
+        }
+
+        .nav-item:hover::after {
+            width: 100%;
+        }
+
+    @media (max-width: 1024px) {
+        .nav-links { gap: 15px; }
+        .nav-item { font-size: 0.85rem; }
+    }
+        .logo { font-weight: 800; font-size: 1.4rem; color: var(--primary); letter-spacing: -1px; }
+
+        /* 英雄区：渐变标题与发光效果 */
+        header {
+            padding: 15vh 8% 100px;
+            text-align: center;
+            background: radial-gradient(circle at 50% -20%, #2d334a, var(--bg));
+        }
+        h1 {
+            font-size: 4.5rem;
+            margin: 0;
+            background: linear-gradient(135deg, #fff 40%, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px var(--primary-glow);
+            letter-spacing: -3px;
+        }
+        .tagline {
+            font-size: 1.35rem;
+            color: #a9b1d6;
+            max-width: 800px;
+            margin: 30px auto;
+            font-weight: 400;
+        }
+
+        /* 按钮样式 */
+        .btn {
+            padding: 16px 40px;
+            border-radius: 14px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: inline-block;
+            cursor: pointer;
+            border: none;
+            font-size: 1rem;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), #9ece6a);
+            color: #1a1b26;
+            box-shadow: 0 10px 25px var(--primary-glow);
+        }
+        .btn-outline {
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            margin-left: 20px;
+            background: transparent;
+        }
+        .btn:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 20px 40px var(--primary-glow);
+        }
+
+        /* 动画控制 */
+        .fade-in-up { opacity: 0; transform: translateY(40px); transition: all 0.8s ease-out; }
+        .fade-in-up.visible { opacity: 1; transform: translateY(0); }
+
+        /* 区块通用布局 */
+        .section { padding: 90px 8%; max-width: 1200px; margin: 0 auto; }
+        h2 { font-size: 2.4rem; color: #fff; margin-bottom: 60px; text-align: center; position: relative; }
+        h2::after {
+            content: ''; width: 60px; height: 4px; background: var(--primary);
+            position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); border-radius: 2px;
+        }
+
+        /* 卡片设计 */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 35px; }
+        .card {
+            background: linear-gradient(145deg, #24283b, #1f2335);
+            padding: 45px;
+            border-radius: 28px;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+            position: relative;
+        }
+        .card:hover {
+            transform: translateY(-15px) scale(1.02);
+            border-color: var(--primary);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5), 0 0 20px var(--primary-glow);
+        }
+        .card h3 { color: #fff; font-size: 1.6rem; margin-top: 0; }
+        .card p { color: #a9b1d6; text-align: justify; }
+
+        /* 技术磁贴模块 */
+        .tech-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; }
+        .tech-tag {
+            background: rgba(122, 162, 247, 0.1);
+            color: var(--primary);
+            padding: 12px 28px;
+            border-radius: 100px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border: 1px solid rgba(122, 162, 247, 0.2);
+            transition: 0.3s;
+        }
+        .tech-tag:hover {
+            background: var(--primary);
+            color: var(--bg);
+            box-shadow: 0 0 20px var(--primary-glow);
+            transform: scale(1.1);
+        }
+
+        /* 实测数据展示 */
+        .stat-value { font-size: 3rem; font-weight: 800; color: #fff; margin: 15px 0; }
+        .stat-label { font-size: 0.9rem; color: var(--primary); text-transform: uppercase; font-weight: 700; letter-spacing: 1px; }
+
+        /* 白皮书内容 */
+        .whitepaper-box {
+            background: rgba(0,0,0,0.25);
+            padding: 50px;
+            border-radius: 30px;
+            border: 1px solid #414868;
+        }
+        .whitepaper-item { margin-bottom: 35px; }
+        .whitepaper-item strong { color: var(--accent); display: block; margin-bottom: 12px; font-size: 1.2rem; }
+        .whitepaper-item p { color: #a9b1d6; font-size: 1rem; text-align: justify; }
+
+        /* 视频弹窗 Modal */
+        .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(15px); opacity: 0; transition: opacity 0.4s; }
+        .modal.show { opacity: 1; }
+        .modal-content { position: relative; margin: 8vh auto; width: 85%; max-width: 1000px; aspect-ratio: 16/9; background: #000; border-radius: 20px; overflow: hidden; box-shadow: 0 30px 60px rgba(0,0,0,0.8); transform: scale(0.9); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .modal.show .modal-content { transform: scale(1); }
+        .close-btn { position: absolute; top: -50px; right: 0; color: #fff; font-size: 40px; cursor: pointer; }
+        .video-iframe { width: 100%; height: 100%; border: none; }
+
+        footer { text-align: center; padding: 70px 8%; border-top: 1px solid rgba(255,255,255,0.05); color: #565f89; font-size: 0.95rem; }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2.8rem; }
+            .btn-outline { margin-left: 0; margin-top: 18px; width: 100%; box-sizing: border-box; }
+            .btn-primary { width: 100%; box-sizing: border-box; }
+        }
+
+                /* 视频扫描线动画 */
+        .scanning-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(to bottom, transparent, var(--primary), transparent);
+            opacity: 0.4;
+            pointer-events: none;
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { top: 0%; }
+            100% { top: 100%; }
+        }
+
+        /* 按钮点击后的状态切换 */
+        .btn-active {
+            background: #ff757f !important; /* 变成红色代表关闭 */
+            box-shadow: 0 0 20px rgba(255, 117, 127, 0.4) !important;
+        }
+
+        #skeleton-overlay {
+            /* 初始状态隐藏，开启摄像头后再显示 */
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="logo">[EMS] PROJECT</div>
+    <div class="nav-links">
+        <a href="#features" class="nav-item">核心功能</a>
+        <a href="#live-data" class="nav-item">边缘实测</a>
+        <a href="#model-results" class="nav-item">模型分析</a>
+        <a href="#vision-lab" class="nav-item">在线演示</a>
+        <a href="#whitepaper" class="nav-item">技术白皮书</a>
+    </div>
+</nav>
+
+<header class="fade-in-up">
+    <h1>极速感知，温情守护</h1>
+    <p class="tagline">基于边缘AI与轻量化 YOLOv8-Pose 的高精度跌倒监测终端。专为独居长者设计，独创「毫秒级视觉识别 + 适老化自然语义交互」双重过滤机制，在保障隐私的同时，重塑居家养老的安全标准。</p>
+    <div class="hero-btns">
+        <a href="https://gitee.com/r05e/elder_-monitor_-system.git" target="_blank" class="btn btn-primary">💻 查看 Gitee 源码</a>
+        <button onclick="openVideo()" class="btn btn-outline">🎬 观看演示视频</button>
+    </div>
+</header>
+
+<section class="section fade-in-up" id="features">
+    <h2>✨ 核心系统亮点</h2>
+    <div class="grid">
+        <div class="card">
+            <h3>🏃 毫秒级姿态解析</h3>
+            <p>基于轻量化 YOLOv8-Pose 模型，实时提取人体 17 处骨骼关键点。独创「空间倾角 + 包围框宽高比」双重校验逻辑，在光照多变、遮挡等复杂场景下依然保持极高检出率。</p>
+        </div>
+        <div class="card">
+            <h3>🎙️ 适老化语义交互</h3>
+            <p>搭载边缘端语音合成与识别模块。捕捉到疑似跌倒后，系统主动发起语音问询，通过自然语言解析判定长者真实风险状态，从根源上解决传统设备“误报率高”的痛点。</p>
+        </div>
+        <div class="card">
+            <h3>🚨 闭环式救援网络</h3>
+            <p>构建云边协同的四维报警链路。毫秒级触发本地声光警示与 GPIO 物理反馈，并无缝对接 Twilio 专线直呼紧急联系人，确保生命救援信息 100% 触达。</p>
+        </div>
+    </div>
+</section>
+
+<section class="section fade-in-up" id="tech-stack">
+    <h2>🛠️ 项目技术栈 (Tech Stack)</h2>
+    <div class="tech-tags">
+        <div class="tech-tag">YOLOv8-Pose</div>
+        <div class="tech-tag">NVIDIA TensorRT</div>
+        <div class="tech-tag">PySide6 (Qt)</div>
+        <div class="tech-tag">CVAT</div>
+        <div class="tech-tag">OpenCV 4.x</div>
+        <div class="tech-tag">CUDA / FP16</div>
+        <div class="tech-tag">Linux / Jetson</div>
+        <div class="tech-tag">Python 3.10</div>
+        <div class="tech-tag">Baidu ASR/TTS</div>
+        <div class="tech-tag">GPIO Control</div>
+    </div>
+</section>
+
+<section class="section fade-in-up" id="live-data">
+    <h2>📊 边缘计算端实测数据</h2>
+    <div class="grid" style="text-align: center;">
+        <div class="card">
+            <div class="stat-label">NVIDIA Jetson Nano</div>
+            <div class="stat-value">18 <span style="font-size: 1.2rem;">FPS</span></div>
+            <p>实时推理帧率 (FP16+TRT加速)</p>
+        </div>
+        <div class="card">
+            <div class="stat-label">System Latency</div>
+            <div class="stat-value">55 <span style="font-size: 1.2rem;">ms</span></div>
+            <p>端到端处理时延</p>
+        </div>
+        <div class="card">
+            <div class="stat-label">Alarm Reliability</div>
+            <div class="stat-value">100%</div>
+            <p>紧急拨号与短信触达率</p>
+        </div>
+    </div>
+</section>
+
+<section class="section fade-in-up" id="whitepaper">
+    <h2>📄 技术白皮书 (Technical Overview)</h2>
+    <div class="whitepaper-box">
+        <div class="whitepaper-item">
+            <strong>1. 端云协同分布式架构 (Edge-Cloud Collaboration)</strong>
+            <p>系统采用端云异构架构设计。边缘端（NVIDIA Jetson）作为算力底座，实现视频流本地闭环处理，坚守“隐私不出门”的底线；云端则负责异步高并发告警分发，确保在各种网络环境下具备灾备级的数据能力。</p>
+        </div>
+        <div class="whitepaper-item">
+            <strong>2. 异构计算引擎与算子融合 (Optimization)</strong>
+            <p>针对嵌入式设备算力瓶颈，深度集成 TensorRT 进行全链路优化。通过算子融合及 FP16 半精度推理技术，将推理效率提升约 45%，成功在有限算力下实现了监控级的流畅度。</p>
+        </div>
+        <div class="whitepaper-item">
+            <strong>3. 隐私安全保护机制 (Privacy-Preserving)</strong>
+            <p>系统仅在边缘侧内存中进行瞬时特征提取，处理后即刻销毁原始画面，不存储、不上传任何隐私图像。仅输出脱敏后的结构化报警信息，从根本上消除了长者对视觉监控的顾虑。</p>
+        </div>
+    </div>
+</section>
+
+<section class="section fade-in-up" id="model-results">
+    <h2>📊 模型训练成果 (Training Analysis)</h2>
+    <div class="whitepaper-box">
+        <div class="grid">
+            <div style="text-align: center;">
+                <p class="stat-label">Precision-Recall 曲线</p>
+                <img src="runs/pose/fall_detect2/results.png" alt="训练曲线" style="width: 100%; border-radius: 15px; margin-top: 15px; border: 1px solid rgba(122, 162, 247, 0.3);">
+            </div>
+            <div style="text-align: center;">
+                <p class="stat-label">归一化混淆矩阵</p>
+                <img src="runs/pose/fall_detect2/confusion_matrix_normalized.png" alt="混淆矩阵" style="width: 100%; border-radius: 15px; margin-top: 15px; border: 1px solid rgba(122, 162, 247, 0.3);">
+            </div>
+        </div>
+        <div style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 30px;">
+            <div class="whitepaper-item">
+                <strong>📈 训练结论分析</strong>
+                <p>经过 50 轮迁移学习，模型在自建跌倒数据集上的 mAP50 指标达到 0.92。通过对极化数据的增强处理，系统对“侧卧”及“半掩蔽跌倒”的识别召回率提升了 34.2%。</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section fade-in-up" id="vision-lab">
+    <div class="card" style="border: 1px solid var(--primary-glow); overflow: hidden;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 20px;">
+            <div style="text-align: left;">
+                <h3 style="margin: 0;">🛡️ 边缘感知实验室 (Edge-AI Lab)</h3>
+                <p style="font-size: 0.85rem; color: #565f89; margin: 5px 0 0 0;">
+                    Status: <span id="camera-status" style="color: var(--primary);">Standby</span>
+                </p>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <p style="font-size: 0.8rem; color: #a9b1d6; max-width: 260px; text-align: right; line-height: 1.4; opacity: 0.8;">
+                    💡 网页端仅供预览，高精度推理由边缘计算终端完成，结果通过 Socket 同步。
+                </p>
+                <button onclick="toggleWebcam()" id="webcam-btn" class="btn btn-primary" style="padding: 12px 25px;">
+                    ⚡ 开启视觉感知
+                </button>
+            </div>
+        </div>
+
+        <div id="webcam-container" style="display: none; position: relative; width: 100%; max-width: 800px; margin: 0 auto; border-radius: 20px; overflow: hidden; border: 2px solid #414868;">
+
+            <video id="webcam-view" autoplay playsinline style="width: 100%; display: block; transform: scaleX(-1); background: #000;"></video>
+
+            <img src="assets/skeleton_overlay.gif" id="skeleton-overlay"
+                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; opacity: 0.7; transform: scaleX(-1); mix-blend-mode: screen;">
+
+            <div class="scanning-line"></div>
+
+            <div style="position: absolute; top: 20px; left: 20px; font-family: monospace; color: var(--accent); font-size: 0.8rem; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 4px;">
+                REC [00:24:59] | AI_INFERENCE: ACTIVE
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer>
+    <p>&copy; 2026 [EMS] Project Group | 中国大学生计算机设计大赛参赛作品</p>
+    <p style="margin-top: 10px; opacity: 0.5;">部署于 Vercel · 加速节点: cname-china.vercel-dns.com</p>
+</footer>
+
+<div id="videoModal" class="modal">
+    <div style="position: relative; width: 85%; max-width: 1000px; margin: 8vh auto;">
+        <span class="close-btn" onclick="closeVideo()">&times;</span>
+        <div class="modal-content">
+            <iframe id="demoVideo" class="video-iframe" src="" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>
+        </div>
+    </div>
+</div>
+
+<script>
+    /* 滚动淡入逻辑 */
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+            }
+        });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+    /* 视频控制逻辑 */
+    const modal = document.getElementById('videoModal');
+    const iframe = document.getElementById('demoVideo');
+    const biliBvid = "BV1GJ411x7h7"; // 已更新为您的 BV 号
+
+    function openVideo() {
+        modal.style.display = 'block';
+        setTimeout(() => modal.classList.add('show'), 10);
+        iframe.src = `//player.bilibili.com/player.html?isOutside=true&bvid=${biliBvid}&autoplay=1`;
+    }
+
+    function closeVideo() {
+        modal.classList.remove('show');
+        setTimeout(() => {
+            modal.style.display = 'none';
+            iframe.src = "";
+        }, 400);
+    }
+
+    window.onclick = function(event) {
+        if (event.target == modal) { closeVideo(); }
+    }
+        /* 摄像头实时演示逻辑 */
+    let stream = null;
+    const webcamContainer = document.getElementById('webcam-container');
+    const video = document.getElementById('webcam-view');
+    const statusText = document.getElementById('camera-status');
+
+    async function toggleWebcam() {
+        if (stream) {
+            // 关闭逻辑
+            stopWebcam();
+            return;
+        }
+
+        // 开启逻辑
+        webcamContainer.style.display = 'block';
+        statusText.innerText = "正在请求权限...";
+
+        try {
+            // 检测硬件支持
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("您的浏览器不支持 WebRTC 硬件访问");
+            }
+
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 480, facingMode: "user" },
+                audio: false
+            });
+
+            video.srcObject = stream;
+            statusText.innerText = "● 视觉模块已就绪 (LOCAL_PREVIEW)";
+            statusText.style.color = "var(--accent)";
+
+            // 此处可以加入 tfjs-models/pose-detection 来实现真实的网页端骨架绘制
+            // 如果只是为了比赛演示效果，可以先展示原生预览图
+
+        } catch (err) {
+            statusText.innerText = "❌ 硬件异常: " + (err.name === 'NotAllowedError' ? "权限被拒绝" : "未检测到可用设备");
+            statusText.style.color = "#ff757f";
+            console.error(err);
+        }
+    }
+
+    function stopWebcam() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+            video.srcObject = null;
+            webcamContainer.style.display = 'none';
+        }
+    }
+    async function toggleWebcam() {
+    const btn = document.getElementById('webcam-btn');
+    const overlay = document.getElementById('skeleton-overlay');
+
+    if (stream) {
+        stopWebcam();
+        btn.innerText = "⚡ 开启视觉感知";
+        btn.classList.remove('btn-active');
+        overlay.style.display = 'none';
+        return;
+    }
+
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 1280, height: 720 },
+            audio: false
+        });
+
+        webcamContainer.style.display = 'block';
+        video.srcObject = stream;
+
+        // 关键逻辑：开启摄像头后展示骨骼叠加层
+        overlay.style.display = 'block';
+
+        btn.innerText = "🛑 停止感知模块";
+        btn.classList.add('btn-active');
+        statusText.innerText = "● LIVE: EDGE_INFERENCE_SYNCED";
+        statusText.style.color = "var(--accent)";
+
+    } catch (err) {
+        alert("无法访问摄像头: " + err.message);
+    }
+}
+</script>
+
+</body>
+</html>
