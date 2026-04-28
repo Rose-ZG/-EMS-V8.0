@@ -316,7 +316,7 @@
         <div class="card">
             <div class="stat-label">Alarm Reliability</div>
             <div class="stat-value">100%</div>
-            <p>紧急拨号与短信触达率</p>
+            <p>紧急E-MAIL短信触达率</p>
         </div>
     </div>
 </section>
@@ -345,17 +345,17 @@
         <div class="grid">
             <div style="text-align: center;">
                 <p class="stat-label">Precision-Recall 曲线</p>
-                <img src="runs/pose/fall_detect2/results.png" alt="训练曲线" style="width: 100%; border-radius: 15px; margin-top: 15px; border: 1px solid rgba(122, 162, 247, 0.3);">
+                <img src="assets/images/Results曲线集.png" alt="训练曲线" style="width: 100%; border-radius: 15px; margin-top: 15px; border: 1px solid rgba(122, 162, 247, 0.3);">
             </div>
             <div style="text-align: center;">
                 <p class="stat-label">归一化混淆矩阵</p>
-                <img src="runs/pose/fall_detect2/confusion_matrix_normalized.png" alt="混淆矩阵" style="width: 100%; border-radius: 15px; margin-top: 15px; border: 1px solid rgba(122, 162, 247, 0.3);">
+                <img src="assets/images/归一化混淆矩阵.jpg" alt="混淆矩阵" style="width: 100%; border-radius: 15px; margin-top: 15px; border: 1px solid rgba(122, 162, 247, 0.3);">
             </div>
         </div>
         <div style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 30px;">
             <div class="whitepaper-item">
                 <strong>📈 训练结论分析</strong>
-                <p>经过 50 轮迁移学习，模型在自建跌倒数据集上的 mAP50 指标达到 0.92。通过对极化数据的增强处理，系统对“侧卧”及“半掩蔽跌倒”的识别召回率提升了 34.2%。</p>
+                <p>经过 50 轮次的深度迁移学习优化，模型在自建跌倒数据集上的各项核心指标均取得突破性进展，全类平均精度（mAP50）达到 0.85。实验结果表明，模型已具备极高的姿态辨识能力与鲁棒性。</p>
             </div>
         </div>
     </div>
