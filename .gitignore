@@ -5,14 +5,15 @@ venv/
 # 排除编译缓存
 __pycache__/
 *.pyc
+temp_audio.wav
 
 # 排除 PyCharm 配置文件
 .idea/
 
-# 排除你的运行记录（防止把组员的抓拍传上去）
+# 排除你的运行记录
 records/
 
-# 排除 YOLO 权重文件（太大了，建议让组员自己下载）
+# 排除 YOLO 权重文件
 *.pt
 
 #排除训练模型过程中出现的本地路径cache
@@ -21,5 +22,10 @@ records/
 # 排除临时文件目录
 temp/
 
-# 排除模型文件（太大了，建议让组员自己下载）
+# 排除模型文件
 models/
+
+# 忽略可执行文件
+ffmpeg.exe
+ffplay.exe
+ffprobe.exe
