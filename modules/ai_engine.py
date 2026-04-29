@@ -119,33 +119,49 @@ class VideoWorker(QThread):
         """在独立线程中运行，通过信号与主界面交互"""
         self.is_interacting = True
         print("\n--- 🚨 进入语音核实流程 ---")
-        self.assistant.speak("系统检测到您可能摔倒了，需要报警吗？请回答需要或不需要。")
-        reply = self.assistant.record_and_transcribe(duration=5)
+        self.assistant.speak("系统检测到您可能摔倒了，需要报警吗？")
+        reply = self.assistant.record_and_transcribe(duration=5).strip()
+        print(f"[语音识别结果]: 「{reply}」")
 
-        danger_keywords = ['要', '救命', '报警', '疼', '是的', '好', '帮我', '摔了']
-        safe_keywords = ['没事', '不用', '不需要', '误报', '没摔', '好着呢']
+        danger_keywords = [
+            '要', '救命', '报警', '疼', '是的', '好', '帮我', '摔了',
+            '起不来', '动不了', '救我', '医生', '快来', '救人', '求救', '紧急'
+        ]
+
+        safe_keywords = [
+            '没事', '不用', '不需要', '误报', '没摔', '好着呢',
+            '走开', '取消', '测试', '我很好', '没有摔', '开玩笑', '自己能起'
+        ]
 
         needs_help = False
-        if len(reply.strip()) < 2:
+        # 1. 首先检查是否完全没有说话（静默判定为危险）
+        if len(reply) < 2:
             print("[语音] 无有效回应 -> 判定为昏迷/危险")
             needs_help = True
-        elif any(word in reply for word in danger_keywords):
-            print("[语音] 用户确认需要帮助")
-            needs_help = True
+
+        # 2. 优先检查“安全关键词”（这样即便说了“不需要报警”，也会先被判定为安全）
         elif any(word in reply for word in safe_keywords):
-            print("[语音] 用户确认安全")
+            print("[语音] 用户确认安全 (命中安全关键词)")
             self.assistant.speak("好的，已为您取消警报。")
             needs_help = False
-        else:
-            print("[语音] 语义不明 -> 默认报警保障安全")
+
+        # 3. 再检查“危险关键词”
+        elif any(word in reply for word in danger_keywords):
+            print("[语音] 用户确认需要帮助 (命中危险关键词)")
             needs_help = True
+
+        # 4. 兜底逻辑：如果用户说了一堆话，但既没说没事，也没说救命
+        else:
+            print("[语音] 语义不明 -> 为了安全起见，默认报警")
+            self.assistant.speak("抱歉，我没听清楚，为您启动紧急求助。")
+            needs_help = True
+
+        # --- 逻辑优化结束 ---
 
         if needs_help:
             self.assistant.speak("已收到，正在通知紧急联系人。")
-            # 发送信号，带上当前的视觉截帧
             self.emergency_call_signal.emit(current_frame)
 
-        # 清除跌倒历史，允许再次检测
         self.fall_history.clear()
         self.is_interacting = False
         print("--- 预案处理完毕 ---\n")
