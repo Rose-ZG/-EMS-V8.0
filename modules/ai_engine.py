@@ -186,7 +186,7 @@ class VideoWorker(QThread):
                 continue
 
             # 推理
-            results = self.model(frame, imgsz=self.inference_size, conf=self.conf_val, verbose=False)
+            results = self.model.track(frame, persist=True, tracker="bytetrack.yaml", conf=0.2)
             is_fall_current = self._fall_detection_logic(results)
             self.fall_history.append(is_fall_current)
 
