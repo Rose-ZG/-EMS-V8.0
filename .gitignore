@@ -29,3 +29,4 @@ models/
 ffmpeg.exe
 ffplay.exe
 ffprobe.exe
+yolov8s.pt
