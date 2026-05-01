@@ -279,7 +279,7 @@
         </div>
         <div class="card">
             <h3>🚨 闭环式救援网络</h3>
-            <p>构建云边协同的四维报警链路。毫秒级触发本地声光警示与 GPIO 物理反馈，并无缝对接 Twilio 专线直呼紧急联系人，确保生命救援信息 100% 触达。</p>
+            <p>构建云边协同的四维报警链路。毫秒级触发本地声光警示反馈，并无缝衔接发送 SOS E-Mail 到预设紧急联系人，内含跌倒者跌倒状态捕捉确保生命救援信息 100% 触达。</p>
         </div>
     </div>
 </section>
@@ -328,8 +328,8 @@
     <h2>📄 技术白皮书 (Technical Overview)</h2>
     <div class="whitepaper-box">
         <div class="whitepaper-item">
-            <strong>1. 端云协同分布式架构 (Edge-Cloud Collaboration)</strong>
-            <p>系统采用端云异构架构设计。边缘端（NVIDIA Jetson）作为算力底座，实现视频流本地闭环处理，坚守“隐私不出门”的底线；云端则负责异步高并发告警分发，确保在各种网络环境下具备灾备级的数据能力。</p>
+            <strong>1. “云-边-端”协同分布式架构 (Edge-Cloud Collaboration)</strong>
+            <p>系统采用“云-边-端”异构架构设计。边缘端（NVIDIA Jetson）作为算力底座，实现视频流本地闭环处理，坚守“隐私不出门”的底线；本地终端负责调试设备，更新信息，实现实时监控；云端则负责异步高并发警报分发，确保在各种网络环境下具备灾备级的数据能力。</p>
         </div>
         <div class="whitepaper-item">
             <strong>2. 异构计算引擎与算子融合 (Optimization)</strong>
