@@ -56,6 +56,7 @@ class Controller(QMainWindow):
             "user": "2047103550@qq.com",
             "password": "liwkwdbylezpeajg"
         }
+
         self.email_notifier = EmailNotifier(self.smtp_config)
 
         self.voice_assistant = VoiceAssistant()
