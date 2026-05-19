@@ -1,5 +1,11 @@
 
-# EMS (Elder Monitor System) 边缘端跌倒检测与智能语音报警系统 V8.0
+# Elder Monitor System V8.0(EMS)
+
+<p align="center">
+  <img src="assets/[EMS].png" alt="EMS Logo" width="200" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+  <br>
+  <em>基于AI YoloV8的独居老人智能姿态监护与多模态报警系统</em>
+</p>
 
 [![Python Version](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Ubuntu%20%7C%20Windows-orange.svg)](https://developer.nvidia.com/embedded/jetson)
