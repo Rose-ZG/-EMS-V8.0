@@ -9,28 +9,32 @@ from PySide6.QtCore import QThread, Signal, QObject
 from PySide6.QtGui import QImage
 from ultralytics import YOLO
 
-# 导入语音助手
+from modules.logger import Logger
 from voice_assistant import VoiceAssistant
 
 class VideoWorker(QThread):
-    # 信号：图像、是否跌倒、FPS
+    #信号：图像、是否跌倒、FPS
     change_pixmap_signal = Signal(QImage, bool, float)
-    # 增加 numpy.ndarray 类型用于传递图像数据
+    #numpy.ndarray类型用于传递图像数据
     emergency_call_signal = Signal(np.ndarray)
+    #即使预警与复位信号
+    pre_alarm_signal = Signal()
+    cancel_alarm_signal = Signal()
 
+    #测试数据集模型runs/pose/fall_detect4/weights/best.pt
     def __init__(self, model_path='yolov8n-pose.pt', debug=False):
         super().__init__()
         self.debug = debug
 
         # 1. 加载视觉模型（回退机制）
         if not os.path.exists(model_path):
-            print(f"[AI] Model {model_path} not found, falling back to yolov8n-pose.pt")
+            self._log(lambda log: log.warn(f"模型 {model_path} 未找到，回退到 yolov8n-pose.pt"))
             model_path = 'yolov8n-pose.pt'
         try:
             self.model = YOLO(model_path)
-            print(f"[AI] 视觉模型已加载: {model_path}")
+            self._log(lambda log: log.info(f"视觉模型已加载: {model_path}"))
         except Exception as e:
-            print(f"[错误] 模型加载失败: {e}")
+            self._log(lambda log: log.error(f"模型加载失败: {e}"))
             self.model = None
 
         # 2. 初始化语音助手
@@ -50,6 +54,13 @@ class VideoWorker(QThread):
         self.camera_id = 0
         self.cap = None
         self._camera_request = None
+
+    @staticmethod
+    def _log(fn):
+        """Logger 未初始化时静默，已初始化则调用"""
+        log = Logger.instance()
+        if log:
+            fn(log)
 
     def _open_camera(self, camera_id):
         backend = cv2.CAP_DSHOW if platform.system() == "Windows" else cv2.CAP_V4L2
@@ -263,11 +274,10 @@ class VideoWorker(QThread):
 
     def handle_emergency(self,current_frame):
         """在独立线程中运行，通过信号与主界面交互"""
-        self.is_interacting = True
-        print("\n--- 🚨 进入语音核实流程 ---")
+        self._log(lambda log: log.voice("🎤 进入语音核实流程"))
         self.assistant.speak("系统检测到您可能摔倒了，需要报警吗？")
         reply = self.assistant.record_and_transcribe(duration=3).strip()
-        print(f"[语音识别结果]: 「{reply}」")
+        self._log(lambda log: log.voice(f"识别结果: 「{reply}」"))
 
         danger_keywords = [
             '要', '救命', '报警', '疼', '是的', '好', '帮我', '摔了',
@@ -282,23 +292,23 @@ class VideoWorker(QThread):
         needs_help = False
         # 1. 首先检查是否完全没有说话（静默判定为危险）
         if len(reply) < 2:
-            print("[语音] 无有效回应 -> 判定为昏迷/危险")
+            self._log(lambda log: log.voice("无有效语音回应 → 判定为昏迷/危险"))
             needs_help = True
 
-        # 2. 优先检查“安全关键词”（这样即便说了“不需要报警”，也会先被判定为安全）
+        # 2. 优先检查"安全关键词"（这样即便说了"不需要报警"，也会先被判定为安全）
         elif any(word in reply for word in safe_keywords):
-            print("[语音] 用户确认安全 (命中安全关键词)")
+            self._log(lambda log: log.voice("用户确认安全 ✅"))
             self.assistant.speak("好的，已为您取消警报。")
             needs_help = False
 
-        # 3. 再检查“危险关键词”
+        # 3. 再检查"危险关键词"
         elif any(word in reply for word in danger_keywords):
-            print("[语音] 用户确认需要帮助 (命中危险关键词)")
+            self._log(lambda log: log.voice("用户确认需要帮助 🆘"))
             needs_help = True
 
         # 4. 兜底逻辑：如果用户说了一堆话，但既没说没事，也没说救命
         else:
-            print("[语音] 语义不明 -> 为了安全起见，默认报警")
+            self._log(lambda log: log.voice("语义不明 → 默认报警"))
             self.assistant.speak("抱歉，我没听清楚，为您启动紧急求助。")
             needs_help = True
 
@@ -307,10 +317,12 @@ class VideoWorker(QThread):
         if needs_help:
             self.assistant.speak("已收到，正在通知紧急联系人。")
             self.emergency_call_signal.emit(current_frame)
+        else:
+            self.cancel_alarm_signal.emit()
 
         self.fall_history.clear()
         self.is_interacting = False
-        print("--- 预案处理完毕 ---\n")
+        self._log(lambda log: log.info("语音核实流程结束"))
 
     def run(self):
         if not self.cap:
@@ -332,16 +344,25 @@ class VideoWorker(QThread):
                 continue
 
             # 推理
-            results = self.model.track(frame, persist=True, tracker="bytetrack.yaml", conf=0.2)
+            results = self.model.track(
+                frame,
+                persist=True,
+                tracker="bytetrack.yaml",
+                conf=self.conf_val,  # 1. 动态应用 UI 面板的置信度滑块值
+                iou=0.5,  # 2. 增加 IoU 阈值进行 NMS (非极大值抑制)，强制合并重叠框
+                classes=[0]  # 3. 强制限定模型仅输出人类 (class 0)，屏蔽其他误检对象
+            )
             fall_score = self._fall_detection_logic(results)
             self.fall_history.append(fall_score)
 
             # 创建带检测框的标注图像（在紧急处理前）
             annotated_frame = results[0].plot() if results else frame
 
-            # 平滑触发 (最近10帧平均>0.5，且非交互状态)
+            # 平滑触发(最近10帧平均>0.5，且非交互状态)
             if not self.is_interacting and len(self.fall_history) >= 10:
                 if sum(self.fall_history) / len(self.fall_history) > 0.5:
+                    self.is_interacting = True
+                    self.pre_alarm_signal.emit()  #让UI瞬间变红！
                     threading.Thread(target=self.handle_emergency, args=(annotated_frame,), daemon=True).start()
 
             # 发送图像给 GUI

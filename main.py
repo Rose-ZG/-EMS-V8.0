@@ -10,9 +10,12 @@ from PySide6.QtCore import *
 
 from modules.ai_engine import VideoWorker
 from modules.hardware_ctrl import HardwareManager
+from modules.logger import Logger
 from ui.dashboard import MainDashboard
+from dotenv import load_dotenv
+load_dotenv()
+
 from modules.email_notifier import EmailNotifier
-from voice_assistant import VoiceAssistant
 
 class Controller(QMainWindow):
     def __init__(self):
@@ -28,12 +31,18 @@ class Controller(QMainWindow):
         self.ui = MainDashboard()
         self.setCentralWidget(self.ui)
 
-        mp3_path = os.path.join(os.path.dirname(__file__), "assets", "audio", "RING.wav")
-        self.hw = HardwareManager(mp3_path=mp3_path)
+        # 初始化统一日志系统
+        self.log = Logger()
+        self.log.signal.message.connect(self.ui.append_log_html)
+        self.log.capture_stdout()
+
+        self.hw = HardwareManager()
 
         self.worker = VideoWorker(debug=False)
         self.worker.change_pixmap_signal.connect(self.update_ui, Qt.QueuedConnection)
         self.worker.emergency_call_signal.connect(self.process_emergency_alert, Qt.QueuedConnection)
+        self.worker.pre_alarm_signal.connect(self.trigger_local_alarm, Qt.QueuedConnection)
+        self.worker.cancel_alarm_signal.connect(self.reset_system, Qt.QueuedConnection)
 
         # 绑定控件
         self.ui.ref_btn.clicked.connect(self.refresh_cameras)
@@ -54,12 +63,13 @@ class Controller(QMainWindow):
             "server": "smtp.qq.com",
             "port": 465,
             "user": "2047103550@qq.com",
-            "password": "liwkwdbylezpeajg"
+            "password": os.environ.get("SMTP_PASSWORD", "")
         }
-
         self.email_notifier = EmailNotifier(self.smtp_config)
 
-        self.voice_assistant = VoiceAssistant()
+        self.contacts = [
+            {"name": "家属A", "email": "2047103550@qq.com", "phone": "", "enabled": True}
+        ]
 
     def sync_params(self):
         slider_val = self.ui.t_slider.value()
@@ -74,42 +84,32 @@ class Controller(QMainWindow):
         # 管理报警状态（与语音交互联动）
         if not self.worker.is_interacting and not self.worker.is_alarming:
             fall_ratio = self.worker.get_fall_ratio()
-            if fall_ratio > 0.7:
-                if not self.is_fall_ongoing:
-                    self.is_fall_ongoing = True
-                    self.fall_start_time = time.time()
-                elif time.time() - self.fall_start_time > 0.5:
-                    self.trigger_alarm()
-            else:
-                self.is_fall_ongoing = False
-                self.fall_start_time = None
 
     def process_emergency_alert(self, frame):
-        # 1. 更新UI报警状态
-        self.ui.status_label.setText("🚨 紧急报警！")
-        self.ui.status_label.setStyleSheet(
-            "font-size:20pt; color:white; background:#d9534f; font-weight:bold; border-radius:14px; padding:14px;")
+        """阶段二：语音确认危险，发送急救邮件"""
+        self.ui.status_label.setText("🚨 紧急求救！已发送通知")
+        self.log.alert("CRITICAL: 语音确认异常！触发终极报警闭环")
 
-        # 2. 自动发送邮件 (带截帧)
-        email_addr = "2047103550@qq.com"  # 实际开发可从 UI 获取
-        self.email_notifier.send_fall_alert(email_addr, frame, location="居家环境监控点A")
+        for contact in self.contacts:
+            if contact.get("enabled") and contact.get("email"):
+                self.email_notifier.send_fall_alert(
+                    contact["email"], frame, location="居家环境监控点A")
+                self.log.alert(f"告警邮件已发送至 {contact['name']}({contact['email']})")
 
-        # 3. 日志记录
-        self.add_log(f"ALERT: 自动闭环告警已触发，邮件已发送至 {email_addr}")
-
-    def trigger_alarm(self):
-        if self.worker.is_alarming:
-            return
-        self.worker.is_alarming = True
-        self.ui.status_label.setText("🚨 紧急报警！")
+    def trigger_local_alarm(self):
+        """阶段一：视觉发现跌倒，瞬间让 UI 变红并开启物理警报灯"""
+        self.ui.status_label.setText("🚨 发现跌倒！语音核实中...")
         self.ui.status_label.setStyleSheet(
             "font-size:20pt; color:white; background:#d9534f; font-weight:bold; border-radius:14px; padding:14px;")
         self.hw.alert_with_voice(active=True)
-        self.add_log("CRITICAL: 检测到跌倒！已触发报警")
-
+        self.log.alert("WARN: 视觉检测到跌倒，正在进行语音核实...")
     def call_for_help(self):
-        self.add_log("USER: 重复呼叫 - 正在使用语音合成进行摔倒确认")
-        self.voice_assistant.speak("检测到异常情况，是否需要帮助？请在五秒内回答")
+        # 【追加防护】：如果 AI 正在交互中，忽略手动点击
+        if self.worker.is_interacting:
+            self.log.warn("系统正在语音交互中，请稍后再试")
+            return
+        self.log.info("用户手动呼叫 - 启动语音确认流程")
+        self.worker.assistant.speak("检测到异常情况，是否需要帮助？请在三秒内回答")
 
     def reset_system(self):
         self.worker.is_alarming = False
@@ -121,20 +121,17 @@ class Controller(QMainWindow):
         self.ui.status_label.setStyleSheet(
             "font-size:20pt; font-weight:bold; color:#11111b; background:#a6e3a1; border-radius:14px; padding:14px;")
         self.hw.alert_with_voice(active=False)
-        self.add_log("INFO: 系统已复位")
+        self.log.success("系统已复位，恢复正常监控")
 
     def send_alert_email(self, fall_frame):
-        """闭环告警：接收 AI 引擎传来的截帧并发送邮件"""
-        receiver = self.ui.phone_edit.text().strip() # 此时 UI 框应输入邮箱
-        if "@" in receiver:
-            # 异步发送邮件防止主界面卡死
-            success = self.email_notifier.send_fall_alert(receiver, fall_frame, location="老人卧室")
-            if success:
-                self.add_log(f"SUCCESS: 告警邮件及截帧已发送至 {receiver}")
-            else:
-                self.add_log("ERROR: 邮件发送失败，请检查网络或授权码")
-        else:
-            self.add_log("ERROR: 未设置有效的紧急联系人邮箱")
+        """闭环告警：向所有启用的联系人发送邮件"""
+        for contact in self.contacts:
+            if contact.get("enabled") and contact.get("email"):
+                success = self.email_notifier.send_fall_alert(contact["email"], fall_frame, location="老人卧室")
+                if success:
+                    self.log.success(f"告警邮件已发送至 {contact['name']}({contact['email']})")
+                else:
+                    self.log.error(f"发送至 {contact['name']}({contact['email']}) 失败")
 
     def refresh_cameras(self):
         self.ui.cam_selector.blockSignals(True)
@@ -163,7 +160,7 @@ class Controller(QMainWindow):
         file_path = os.path.join(path, f"{prefix}_{time.strftime('%H%M%S')}.jpg")
         if self.ui.video_label.pixmap():
             self.ui.video_label.pixmap().save(file_path)
-            self.add_log(f"已保存截图")
+            self.log.info("截图已保存")
 
     def open_folder(self):
         path = os.path.join(os.getcwd(), "records")
@@ -178,12 +175,9 @@ class Controller(QMainWindow):
     def save_phone_number(self):
         email = self.ui.phone_edit.text().strip()
         if email and "@" in email and "." in email.split("@")[-1]:
-            self.add_log(f"INFO: 紧急联系人邮箱已设置: {email}")
+            self.log.success(f"紧急联系人邮箱已设置: {email}")
         else:
-            self.add_log("ERROR: 请输入有效的邮箱地址")
-
-    def add_log(self, msg):
-        self.ui.append_log(f"[{time.strftime('%H:%M:%S')}] {msg}")
+            self.log.error("请输入有效的邮箱地址")
 
     def closeEvent(self, event):
         self.worker.stop()

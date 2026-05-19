@@ -1,26 +1,15 @@
 import serial
 import serial.tools.list_ports
 import os
-import threading
 import platform
 
 class HardwareManager:
-    def __init__(self, port=None, baudrate=9600, mp3_path="RING.wav",):
+    def __init__(self, port=None, baudrate=9600):
         self.available = False
         self.ser = None
-        self.mp3_path = mp3_path
         self.os_type = platform.system()
 
-        self.pygame_imported = False
-        try:
-            import pygame
-            pygame.mixer.init()
-            self.pygame = pygame
-            self.pygame_imported = True
-            print("[HW] pygame音频初始化成功")
-        except Exception as e:
-            print(f"[HW] pygame音频初始化失败: {e}")
-
+        # 自动检测并连接可用串口
         port = port or self._auto_detect_serial()
         if port:
             try:
@@ -52,44 +41,17 @@ class HardwareManager:
                 print(f"[HW] 串口发送失败: {e}")
         return False
 
-    def _play_audio_async(self, file_path, repeat=1):
-        if not self.pygame_imported:
-            return
-        def play():
-            try:
-                self.pygame.mixer.music.stop()
-                self.pygame.mixer.music.load(file_path)
-                for _ in range(repeat):
-                    self.pygame.mixer.music.play()
-                    while self.pygame.mixer.music.get_busy():
-                        self.pygame.time.delay(100)
-            except Exception as e:
-                print(f"[HW] 音频播放失败: {e}")
-        threading.Thread(target=play, daemon=True).start()
-
-    def play_audio(self, file_path, repeat=1):
-        if os.path.exists(file_path):
-            self._play_audio_async(file_path, repeat)
-        else:
-            print(f"[HW] Audio file not found: {file_path}")
-
     def alert_with_voice(self, active=True):
+        # 声音已完全交由主程序的 TTS (Piper) 处理
+        # 本模块仅保留物理串口硬件报警器的触发逻辑
         serial_ok = self.send_alarm(active)
-        if active:
-            if os.path.exists(self.mp3_path):
-                self._play_audio_async(self.mp3_path, repeat=2)
-        else:
-            if self.pygame_imported:
-                self.pygame.mixer.music.stop()
-        print(f"[HW] 报警触发: 串口={serial_ok}")
+        print(f"[HW] 物理报警触发: 串口={serial_ok}, 状态={active}")
 
     def call_emergency(self, to_number):
         print(f"[HW] 已触发本地求救指令，等待主模块发送邮件至目标地址")
         return True
 
-
     def close(self):
-        if self.pygame_imported:
-            self.pygame.mixer.quit()
+        # 仅需关闭串口，无需再处理 pygame 释放
         if self.ser:
             self.ser.close()

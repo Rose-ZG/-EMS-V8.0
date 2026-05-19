@@ -5,6 +5,14 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
+from modules.logger import Logger
+
+
+def _elog(fn):
+    log = Logger.instance()
+    if log:
+        fn(log)
+
 
 class EmailNotifier:
     def __init__(self, smtp_config):
@@ -51,7 +59,7 @@ class EmailNotifier:
             img_mime.add_header('Content-Disposition', 'attachment', filename=f"fall_{int(time.time())}.jpg")
             msg.attach(img_mime)
         except Exception as e:
-            print(f"[SMTP] 图片处理失败: {e}")
+            _elog(lambda log: log.error(f"邮件图片处理失败: {e}"))
 
         # 4. 执行发送
         try:
@@ -59,8 +67,8 @@ class EmailNotifier:
             server.login(self.config['user'], self.config['password'])
             server.sendmail(self.config['user'], [receiver_email], msg.as_string())
             server.quit()
-            print(f"[SMTP] Alert email sent to: {receiver_email}")
+            _elog(lambda log: log.success(f"告警邮件已发送至 {receiver_email}"))
             return True
         except Exception as e:
-            print(f"[SMTP] 邮件发送失败: {e}")
+            _elog(lambda log: log.error(f"邮件发送失败: {e}"))
             return False

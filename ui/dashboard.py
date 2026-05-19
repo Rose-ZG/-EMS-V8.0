@@ -111,7 +111,7 @@ class MainDashboard(QWidget):
         right_container.addWidget(log_label)
         self.log_box = QTextEdit()
         self.log_box.setReadOnly(True)
-        self.log_box.setMaximumHeight(120)
+        self.log_box.setMaximumHeight(250)
         right_container.addWidget(self.log_box)
 
         contact_group = QGroupBox("📞 紧急联系人")
@@ -134,6 +134,9 @@ class MainDashboard(QWidget):
 
         main_layout.addLayout(right_container, 3)
 
-    def append_log(self, message):
-        self.log_box.append(message)
-        self.log_box.verticalScrollBar().setValue(self.log_box.verticalScrollBar().maximum())
+    def append_log_html(self, html: str):
+        """支持 HTML 彩色日志"""
+        self.log_box.append(html)
+        # 自动滚到底部
+        sb = self.log_box.verticalScrollBar()
+        sb.setValue(sb.maximum())
