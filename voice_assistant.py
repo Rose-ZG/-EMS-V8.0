@@ -4,6 +4,7 @@ import sounddevice as sd
 from scipy.io.wavfile import write
 from faster_whisper import WhisperModel
 from modules.logger import Logger
+from modules._resource import resource_path
 
 
 def _vlog(fn):
@@ -14,11 +15,9 @@ def _vlog(fn):
 
 
 class VoiceAssistant:
-    def __init__(self, model_path="./models/whisper-small"):
-        """
-        初始化本地语音引擎：TTS (播报) + Whisper (识别)
-        首次运行请将 Faster-Whisper 的 small 模型放入 ./models/whisper-small
-        """
+    def __init__(self, model_path=None):
+        if model_path is None:
+            model_path = resource_path("models/whisper-small")
         _vlog(lambda log: log.info("正在初始化本地语音引擎..."))
 
         # Whisper - 初始化语音识别模型

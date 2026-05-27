@@ -10,6 +10,7 @@ from PySide6.QtGui import QImage
 from ultralytics import YOLO
 
 from modules.logger import Logger
+from modules._resource import resource_path
 from voice_assistant import VoiceAssistant
 
 class VideoWorker(QThread):
@@ -22,14 +23,18 @@ class VideoWorker(QThread):
     cancel_alarm_signal = Signal()
 
     #测试数据集模型runs/pose/fall_detect4/weights/best.pt
-    def __init__(self, model_path='yolov8n-pose.pt', debug=False):
+    def __init__(self, model_path=None, debug=False):
         super().__init__()
         self.debug = debug
 
+        if model_path is None:
+            model_path = resource_path('yolov8n-pose.pt')
+
         # 1. 加载视觉模型（回退机制）
         if not os.path.exists(model_path):
-            self._log(lambda log: log.warn(f"模型 {model_path} 未找到，回退到 yolov8n-pose.pt"))
-            model_path = 'yolov8n-pose.pt'
+            fallback = resource_path('yolov8n-pose.pt')
+            self._log(lambda log: log.warn(f"模型 {model_path} 未找到，回退到 {fallback}"))
+            model_path = fallback
         try:
             self.model = YOLO(model_path)
             self._log(lambda log: log.info(f"视觉模型已加载: {model_path}"))

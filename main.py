@@ -1,9 +1,20 @@
-import sys, os, time, cv2, subprocess
-import platform
+import sys, os
 
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+# PyInstaller --windowed 模式下 sys.stdout/stderr 为 None，但 ultralytics 等库
+# 在 import 时就用 logging.StreamHandler 捕获了 stderr。这里必须最早设置，
+# 否则后续所有 logging.StreamHandler.emit() 会因 None.write() 而崩溃。
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, 'w')
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, 'w')
+
+import time, cv2, subprocess, io, platform
+import logging
+
+# 静默 ultralytics 等第三方库的 per-frame 调试日志
+for _name in ('ultralytics', 'faster_whisper', 'PIL', 'matplotlib'):
+    logging.getLogger(_name).setLevel(logging.WARNING)
+
 from PySide6.QtWidgets import *
 from PySide6.QtGui import *
 from PySide6.QtCore import *
@@ -12,8 +23,11 @@ from modules.ai_engine import VideoWorker
 from modules.hardware_ctrl import HardwareManager
 from modules.logger import Logger
 from ui.dashboard import MainDashboard
+from modules._resource import resource_path
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(resource_path('.env'))
+
+from ui.setup_dialog import SetupDialog
 
 from modules.email_notifier import EmailNotifier
 
@@ -22,6 +36,7 @@ class Controller(QMainWindow):
         self.os_type = platform.system()
         super().__init__()
         self.setWindowTitle("居家康复监测系统[EMS] v8.0")
+        self.setWindowIcon(QIcon(resource_path("assets/EMS_logo.ico")))
         self.resize(1200, 850)
 
         self.available_cams = []
@@ -60,9 +75,9 @@ class Controller(QMainWindow):
         self.refresh_cameras()
 
         self.smtp_config = {
-            "server": "smtp.qq.com",
-            "port": 465,
-            "user": "2047103550@qq.com",
+            "server": os.environ.get("SMTP_SERVER", "smtp.qq.com"),
+            "port": int(os.environ.get("SMTP_PORT", "465")),
+            "user": os.environ.get("SMTP_USER", ""),
             "password": os.environ.get("SMTP_PASSWORD", "")
         }
         self.email_notifier = EmailNotifier(self.smtp_config)
@@ -187,6 +202,14 @@ class Controller(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+
+    # 首次启动 / 缺少配置时弹出设置向导
+    if SetupDialog.needs_setup():
+        dlg = SetupDialog()
+        if dlg.exec() == QDialog.Rejected:
+            # 用户选择跳过——仍可启动，但告警邮件功能不可用
+            pass
+
     window = Controller()
     window.show()
     sys.exit(app.exec())

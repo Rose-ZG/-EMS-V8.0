@@ -1,4 +1,6 @@
+import os
 from PySide6.QtWidgets import *
+from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt
 
 class MainDashboard(QWidget):
@@ -64,6 +66,19 @@ class MainDashboard(QWidget):
         # ---------- 右侧控制区 ----------
         right_container = QVBoxLayout()
         right_container.setSpacing(20)
+
+        # 程序 Logo
+        self.logo_label = QLabel()
+        try:
+            from modules._resource import resource_path
+            logo_path = resource_path("assets/[EMS].png")
+        except Exception:
+            logo_path = ""
+        if os.path.exists(logo_path):
+            pix = QPixmap(logo_path).scaledToWidth(220, Qt.SmoothTransformation)
+            self.logo_label.setPixmap(pix)
+            self.logo_label.setAlignment(Qt.AlignCenter)
+            right_container.addWidget(self.logo_label)
 
         self.status_label = QLabel("🟢 系统实时监控中")
         self.status_label.setAlignment(Qt.AlignCenter)
