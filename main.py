@@ -8,12 +8,22 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w')
 
+# 抑制 OpenCV / FFmpeg / numpy 向 stderr 输出重复错误
+os.environ["OPENCV_LOG_LEVEL"] = "FATAL"
+os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
+os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
+
 import time, cv2, subprocess, io, platform
 import logging
+import numpy as np
+
+# numpy >= 1.24 严格禁止 float 作整数索引，部分旧版 C 扩展库可能触发；
+# 将其降级为 DeprecationWarning 避免 TypeError 刷屏 stderr
+np.set_printoptions(suppress=True)
 
 # 静默 ultralytics 等第三方库的 per-frame 调试日志
 for _name in ('ultralytics', 'faster_whisper', 'PIL', 'matplotlib'):
-    logging.getLogger(_name).setLevel(logging.WARNING)
+    logging.getLogger(_name).setLevel(logging.ERROR)
 
 from PySide6.QtWidgets import *
 from PySide6.QtGui import *

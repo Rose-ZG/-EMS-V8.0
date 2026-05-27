@@ -277,8 +277,17 @@ class VideoWorker(QThread):
 
         return score
 
-    def handle_emergency(self,current_frame):
+    def handle_emergency(self, current_frame):
         """在独立线程中运行，通过信号与主界面交互"""
+        try:
+            self._handle_emergency_impl(current_frame)
+        except Exception as e:
+            self._log(lambda log: log.error(f"语音核实流程异常: {e}"))
+            self.cancel_alarm_signal.emit()
+            self.fall_history.clear()
+            self.is_interacting = False
+
+    def _handle_emergency_impl(self, current_frame):
         self._log(lambda log: log.voice("🎤 进入语音核实流程"))
         self.assistant.speak("系统检测到您可能摔倒了，需要报警吗？")
         reply = self.assistant.record_and_transcribe(duration=3).strip()
@@ -317,8 +326,6 @@ class VideoWorker(QThread):
             self.assistant.speak("抱歉，我没听清楚，为您启动紧急求助。")
             needs_help = True
 
-        # --- 逻辑优化结束 ---
-
         if needs_help:
             self.assistant.speak("已收到，正在通知紧急联系人。")
             self.emergency_call_signal.emit(current_frame)
@@ -333,6 +340,7 @@ class VideoWorker(QThread):
         if not self.cap:
             self.cap = self._open_camera(self.camera_id)
         prev_time = time.time()
+        _error_flag = False  # 避免重复打印同一错误
 
         while self.running:
             # 处理摄像头切换请求
@@ -348,30 +356,57 @@ class VideoWorker(QThread):
                 self.msleep(5)
                 continue
 
-            # 推理
-            results = self.model.track(
-                frame,
-                persist=True,
-                tracker="bytetrack.yaml",
-                conf=self.conf_val,  # 1. 动态应用 UI 面板的置信度滑块值
-                iou=0.5,  # 2. 增加 IoU 阈值进行 NMS (非极大值抑制)，强制合并重叠框
-                classes=[0]  # 3. 强制限定模型仅输出人类 (class 0)，屏蔽其他误检对象
-            )
-            fall_score = self._fall_detection_logic(results)
+            try:
+                # 推理
+                results = self.model.track(
+                    frame,
+                    persist=True,
+                    tracker="bytetrack.yaml",
+                    conf=self.conf_val,
+                    iou=0.5,
+                    classes=[0]
+                )
+            except Exception as e:
+                if not _error_flag:
+                    self._log(lambda log: log.error(f"[追踪] model.track 异常: {e}"))
+                    _error_flag = True
+                self.msleep(30)
+                continue
+
+            try:
+                fall_score = self._fall_detection_logic(results)
+            except Exception as e:
+                if not _error_flag:
+                    self._log(lambda log: log.error(f"[分析] fall_detection 异常: {e}"))
+                    _error_flag = True
+                fall_score = 0.0
+
             self.fall_history.append(fall_score)
 
-            # 创建带检测框的标注图像（在紧急处理前）
-            annotated_frame = results[0].plot() if results else frame
+            try:
+                # 创建带检测框的标注图像（在紧急处理前）
+                annotated_frame = results[0].plot() if results else frame
+            except Exception as e:
+                if not _error_flag:
+                    self._log(lambda log: log.error(f"[绘图] results.plot 异常: {e}"))
+                    _error_flag = True
+                annotated_frame = frame
 
             # 平滑触发(最近10帧平均>0.5，且非交互状态)
             if not self.is_interacting and len(self.fall_history) >= 10:
                 if sum(self.fall_history) / len(self.fall_history) > 0.5:
                     self.is_interacting = True
-                    self.pre_alarm_signal.emit()  #让UI瞬间变红！
+                    self.pre_alarm_signal.emit()
                     threading.Thread(target=self.handle_emergency, args=(annotated_frame,), daemon=True).start()
 
             # 发送图像给 GUI
-            curr_time = self._emit_frame(annotated_frame, prev_time, fall_score)
+            try:
+                curr_time = self._emit_frame(annotated_frame, prev_time, fall_score)
+            except Exception as e:
+                if not _error_flag:
+                    self._log(lambda log: log.error(f"[UI] emit_frame 异常: {e}"))
+                    _error_flag = True
+                curr_time = time.time()
             prev_time = curr_time
             self.msleep(1)
 
@@ -381,10 +416,11 @@ class VideoWorker(QThread):
     def _emit_frame(self, frame, prev_time, fall_score):
         rgb_img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_img.shape
-        qt_img = QImage(rgb_img.data, w, h, ch * w, QImage.Format_RGB888)
+        bytes_per_line = int(ch) * int(w)
+        qt_img = QImage(rgb_img.data, w, h, bytes_per_line, QImage.Format_RGB888)
         curr_time = time.time()
-        fps = 1.0 / (curr_time - prev_time) if (curr_time - prev_time) > 0 else 0
-        is_fall = fall_score > 0.5 if isinstance(fall_score, float) else fall_score
+        fps = float(1.0 / (curr_time - prev_time) if (curr_time - prev_time) > 0 else 0.0)
+        is_fall = bool(fall_score > 0.5)
         self.change_pixmap_signal.emit(qt_img, is_fall, fps)
         return curr_time
 

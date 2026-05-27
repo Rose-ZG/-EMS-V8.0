@@ -56,16 +56,20 @@ class VoiceAssistant:
             _vlog(lambda log: log.error("Whisper 模型未加载，无法进行语音识别"))
             return ""
         fs = 16000
+        frames = int(duration * fs)
         _vlog(lambda log: log.voice(f"🎙️ 开始录音 ({duration} 秒)..."))
         try:
-            recording = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
+            recording = sd.rec(frames, samplerate=fs, channels=1, dtype='int16')
             sd.wait()
             sd.stop()
             os.makedirs(os.path.dirname(filename), exist_ok=True)
             write(filename, fs, recording)
 
             _vlog(lambda log: log.voice("🔄 语音识别中..."))
-            segments, _ = self.model.transcribe(filename, language="zh", beam_size=5)
+            segments, _ = self.model.transcribe(
+                filename, language="zh", beam_size=5,
+                vad_filter=False  # 短录音无需 VAD，且避免 numpy >= 1.24 的 float32 索引兼容性问题
+            )
             text = "".join([s.text for s in segments])
             _vlog(lambda log: log.voice(f"📝 识别结果: {text}"))
             return text.strip()

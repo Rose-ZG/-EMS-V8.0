@@ -69,6 +69,9 @@ class Logger:
 
 
 class _Bridge:
+    _last_msg = None   # 类级别：跨实例去重
+    _first_error = True
+
     def __init__(self, logger, level):
         self.logger = logger
         self.level = level
@@ -81,10 +84,26 @@ class _Bridge:
             self.buf = lines.pop()
             for line in lines:
                 line = line.strip()
-                if line:
+                if not line:
+                    continue
+                if line == _Bridge._last_msg:
+                    continue
+                _Bridge._last_msg = line
+                # 首次遇到 TypeError 时打印调用栈辅助定位
+                if _Bridge._first_error and "numpy.float32" in line:
+                    _Bridge._first_error = False
+                    import traceback
                     self.logger._emit(self.level, line)
+                    for tb_line in traceback.format_stack(limit=20):
+                        for sub in tb_line.strip().split("\n"):
+                            sub = sub.strip()
+                            if sub:
+                                self.logger._emit("DEBUG", f"  [栈] {sub}")
+                    return
+                self.logger._emit(self.level, line)
 
     def flush(self):
-        if self.buf.strip():
+        if self.buf.strip() and self.buf.strip() != _Bridge._last_msg:
+            _Bridge._last_msg = self.buf.strip()
             self.logger._emit(self.level, self.buf.strip())
-            self.buf = ""
+        self.buf = ""
