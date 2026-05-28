@@ -449,13 +449,64 @@
         .lottie-anim {
             width: 100%; height: 100%;
         }
-        
+    
+        /* ============================================
+           提取码样式 (融合自 index.html)
+           ============================================ */
         .extract-code {
             display: inline-block; background: rgba(158, 238, 106, 0.15);
             color: var(--accent); padding: 5px 16px;
             border-radius: 6px; font-size: 1rem;
             font-weight: 700; letter-spacing: 3px;
             border: 1px solid var(--accent); margin-left: 8px;
+        }
+    
+        /* ============================================
+           悬浮背景音乐控制台
+           ============================================ */
+        .music-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 9999;
+            background: rgba(15,23,42,0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #94a3b8;
+            padding: 10px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .music-btn:hover {
+            border-color: #2563eb;
+            color: #fff;
+            transform: translateY(-3px);
+            background: rgba(15,23,42,0.9);
+            box-shadow: 0 12px 40px rgba(37,99,235,0.25);
+        }
+        .music-btn.playing {
+            border-color: #06b6d4;
+            color: #06b6d4;
+            box-shadow: 0 0 20px rgba(6,182,212,0.25);
+        }
+        .music-btn .music-icon {
+            font-size: 1.2rem;
+            display: inline-block;
+        }
+        .music-btn.playing .music-icon {
+            animation: music-spin 4s linear infinite;
+        }
+        @keyframes music-spin {
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -945,6 +996,60 @@
         });
         anim.setSpeed(speed);
         lottieInstances.push(anim);
+    });
+</script>
+
+<!-- ================= 背景音乐模块 ================= -->
+<audio id="bg-music" loop preload="auto">
+    <source src="BGM.mp3" type="audio/mp3">
+</audio>
+<button id="music-toggle" class="music-btn" title="播放/暂停背景音乐">
+    <span class="music-icon">💿</span> BGM: <span id="music-status">OFF</span>
+</button>
+
+<script>
+    /* ══════════════════════════════════════
+       背景音乐智能控制逻辑
+       ══════════════════════════════════════ */
+    document.addEventListener("DOMContentLoaded", function() {
+        const bgMusic = document.getElementById('bg-music');
+        const musicToggleBtn = document.getElementById('music-toggle');
+        const musicStatus = document.getElementById('music-status');
+        let isMusicPlaying = false;
+
+        // 设置默认音量为40%，作为背景音更加柔和舒适
+        bgMusic.volume = 0.4;
+
+        function toggleMusic() {
+            if (isMusicPlaying) {
+                bgMusic.pause();
+                musicToggleBtn.classList.remove('playing');
+                musicStatus.innerText = 'OFF';
+            } else {
+                bgMusic.play().then(() => {
+                    musicToggleBtn.classList.add('playing');
+                    musicStatus.innerText = 'ON';
+                }).catch(err => {
+                    console.warn("浏览器拦截了自动播放:", err);
+                });
+            }
+            isMusicPlaying = !isMusicPlaying;
+        }
+
+        // 点击右下角按钮控制播放
+        musicToggleBtn.addEventListener('click', function(e) {
+            e.stopPropagation(); // 阻止事件冒泡，避免触发下方全局点击
+            toggleMusic();
+        });
+
+        // 核心：用户在页面任意位置发生第一次交互时，自动唤醒音乐
+        document.body.addEventListener('click', function autoPlayOnce() {
+            if (!isMusicPlaying) {
+                toggleMusic();
+            }
+            // 触发一次后立刻销毁该监听器，不再干预后续点击
+            document.body.removeEventListener('click', autoPlayOnce);
+        }, { once: true });
     });
 </script>
 </body>
