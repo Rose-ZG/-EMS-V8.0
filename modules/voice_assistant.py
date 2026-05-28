@@ -3,8 +3,8 @@ import torch
 import sounddevice as sd
 from scipy.io.wavfile import write
 from faster_whisper import WhisperModel
-from modules.logger import Logger
-from modules._resource import resource_path
+from .logger import Logger
+from ._resource import resource_path
 
 
 def _vlog(fn):
@@ -114,5 +114,5 @@ class VoiceAssistant:
 
 if __name__ == "__main__":
         assistant = VoiceAssistant()
-        # 启动试音，每次录音 3 秒
+        # 启动试音，每次录音3秒
         assistant.test_microphone(duration=3)

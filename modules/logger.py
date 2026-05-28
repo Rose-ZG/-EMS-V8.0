@@ -69,7 +69,7 @@ class Logger:
 
 
 class _Bridge:
-    _last_msg = None   # 类级别：跨实例去重
+    _last_msg = None   #类级别：跨实例去重
     _first_error = True
 
     def __init__(self, logger, level):
@@ -89,7 +89,7 @@ class _Bridge:
                 if line == _Bridge._last_msg:
                     continue
                 _Bridge._last_msg = line
-                # 首次遇到 TypeError 时打印调用栈辅助定位
+                #首次遇到TypeError时打印调用栈辅助定位
                 if _Bridge._first_error and "numpy.float32" in line:
                     _Bridge._first_error = False
                     import traceback

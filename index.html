@@ -3,248 +3,404 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>[EMS] Project | 智能居家康复监测系统 v8.0</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <meta name="description" content="[EMS] 智能居家康复监测系统 — 基于边缘AI的跌倒检测终端，专为独居长者设计。">
+    <meta name="theme-color" content="#020617">
+    <title>[EMS] Project | 智能居家康复监测系统</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #1a1b26;
-            --card-bg: #24283b;
-            --primary: #7aa2f7;
-            --accent: #9ece6a;
-            --text: #c0caf5;
-            --primary-glow: rgba(122, 162, 247, 0.4);
-            --accent-glow: rgba(158, 238, 106, 0.2);
+            --bg: #020617;
+            --surface: #0a0e1a;
+            --card: rgba(15,23,42,0.6);
+            --primary: #2563eb;
+            --primary-bright: #3b82f6;
+            --accent: #06b6d4;
+            --text: #94a3b8;
+            --text-dim: #64748b;
+            --heading: #f1f5f9;
+            --border: rgba(255,255,255,0.06);
+            --border-active: rgba(255,255,255,0.12);
+            --glow-blue: rgba(37,99,235,0.15);
+            --glow-cyan: rgba(6,182,212,0.1);
         }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: 'Inter', 'PingFang SC', sans-serif;
-            margin: 0;
+            font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif;
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
-            scroll-behavior: smooth;
             overflow-x: hidden;
-        }
-
-            /* 导航栏增强样式 */
-        nav {
-            padding: 0 8%;
-            height: 80px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(26, 27, 38, 0.85);
-            backdrop-filter: blur(15px);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
-        }
-
-            .nav-links {
-                display: flex;
-                gap: 30px;
-            }
-
-        .nav-item {
-            color: var(--text);
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 0.95rem;
-            position: relative;
-            padding: 10px 0;
-            transition: color 0.3s;
-        }
-
-        .nav-item:hover {
-            color: var(--primary);
-        }
-
-        /* 悬浮下划线动画 */
-        .nav-item::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 0;
-            height: 2px;
-            background: var(--primary);
-            transition: width 0.3s ease;
-            box-shadow: 0 0 8px var(--primary-glow);
-        }
-
-        .nav-item:hover::after {
-            width: 100%;
-        }
-
-    @media (max-width: 1024px) {
-        .nav-links { gap: 15px; }
-        .nav-item { font-size: 0.85rem; }
-    }
-        .logo { font-weight: 800; font-size: 1.4rem; color: var(--primary); letter-spacing: -1px; }
-
-        /* 渐变标题与发光效果 */
-        header {
-            padding: 15vh 8% 100px;
-            text-align: center;
-            background: radial-gradient(circle at 50% -20%, #2d334a, var(--bg));
-        }
-        h1 {
-            font-size: 4.5rem;
-            margin: 0;
-            background: linear-gradient(135deg, #fff 40%, var(--primary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 30px var(--primary-glow);
-            letter-spacing: -3px;
-        }
-        .tagline {
-            font-size: 1.35rem;
-            color: #a9b1d6;
-            max-width: 800px;
-            margin: 30px auto;
+            -webkit-font-smoothing: antialiased;
             font-weight: 400;
         }
 
-        /* 按钮样式 */
+        /* ===== 全局滚动条 ===== */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+
+        /* ===== 粒子画布 ===== */
+        #particles-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+        nav, header, .section, .sticky-section, footer, .modal { position: relative; z-index: 1; }
+
+        /* ===== 导航 ===== */
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+            padding: 0 clamp(24px, 6vw, 80px); height: 56px;
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(2,6,23,0.78);
+            backdrop-filter: saturate(180%) blur(24px);
+            -webkit-backdrop-filter: saturate(180%) blur(24px);
+            border-bottom: 1px solid var(--border);
+            transition: background 0.3s;
+        }
+        .logo { font-weight: 800; font-size: 0.95rem; color: var(--heading); letter-spacing: -0.3px; }
+        .nav-links { display: flex; gap: 28px; }
+        .nav-item {
+            color: var(--text-dim); text-decoration: none;
+            font-weight: 500; font-size: 0.76rem;
+            transition: color 0.25s; letter-spacing: -0.1px;
+        }
+        .nav-item:hover { color: #fff; }
+        @media (max-width: 768px) { .nav-links { display: none; } }
+
+        /* ===== Hero — 全屏沉浸 ===== */
+        header {
+            min-height: 100vh; display: flex;
+            flex-direction: column; justify-content: center; align-items: center;
+            text-align: center; padding: 120px 24px 100px;
+            position: relative; overflow: hidden;
+        }
+        .hero-bg-orb {
+            position: absolute;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 1000px; height: 1000px;
+            background: radial-gradient(ellipse at center,
+                rgba(37,99,235,0.08) 0%,
+                rgba(6,182,212,0.04) 30%,
+                rgba(37,99,235,0.02) 50%,
+                transparent 65%);
+            pointer-events: none;
+        }
+        .hero-grid {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-image:
+                linear-gradient(rgba(37,99,235,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(37,99,235,0.03) 1px, transparent 1px);
+            background-size: 80px 80px;
+            pointer-events: none;
+            mask-image: radial-gradient(ellipse at center, black 30%, transparent 60%);
+            -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 60%);
+        }
+        .hero-label {
+            font-size: 0.72rem; font-weight: 600; letter-spacing: 2px;
+            text-transform: uppercase; color: var(--primary-bright);
+            margin-bottom: 24px; position: relative; z-index: 1;
+        }
+        h1 {
+            font-size: clamp(3.2rem, 7vw, 5.5rem);
+            font-weight: 900; letter-spacing: -0.05em;
+            line-height: 1.06; margin: 0;
+            background: linear-gradient(175deg,
+                #ffffff 0%, #e2e8f0 25%,
+                #60a5fa 55%, #22d3ee 80%,
+                #60a5fa 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            position: relative; z-index: 1;
+            max-width: 900px;
+        }
+        .tagline {
+            font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+            color: var(--text-dim); max-width: 580px;
+            margin: 22px auto 42px;
+            font-weight: 400; line-height: 1.7;
+            position: relative; z-index: 1;
+        }
+        .hero-btns { position: relative; z-index: 1; display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+        /* ===== 按钮 ===== */
         .btn {
-            padding: 16px 40px;
-            border-radius: 14px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            display: inline-block;
-            cursor: pointer;
-            border: none;
-            font-size: 1rem;
+            padding: 13px 30px; border-radius: 8px;
+            text-decoration: none; font-weight: 600;
+            font-size: 0.88rem; letter-spacing: -0.1px;
+            transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+            display: inline-block; cursor: pointer; border: none;
         }
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary), #9ece6a);
-            color: #1a1b26;
-            box-shadow: 0 10px 25px var(--primary-glow);
+            background: #2563eb; color: #fff;
+        }
+        .btn-primary:hover {
+            background: #3b82f6;
+            box-shadow: 0 8px 32px rgba(37,99,235,0.35);
+            transform: translateY(-2px);
         }
         .btn-outline {
-            border: 2px solid var(--primary);
-            color: var(--primary);
-            margin-left: 20px;
+            color: #94a3b8;
             background: transparent;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
         }
-        .btn:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 20px 40px var(--primary-glow);
+        .btn-outline:hover {
+            color: #fff;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+            background: rgba(255,255,255,0.03);
+            transform: translateY(-2px);
         }
-
-        /* 动画控制 */
-        .fade-in-up { opacity: 0; transform: translateY(40px); transition: all 0.8s ease-out; }
-        .fade-in-up.visible { opacity: 1; transform: translateY(0); }
-
-        /* 区块通用布局 */
-        .section { padding: 90px 8%; max-width: 1200px; margin: 0 auto; }
-        h2 { font-size: 2.4rem; color: #fff; margin-bottom: 60px; text-align: center; position: relative; }
-        h2::after {
-            content: ''; width: 60px; height: 4px; background: var(--primary);
-            position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); border-radius: 2px;
+        @media (max-width: 768px) {
+            .btn, .btn-outline { width: 100%; }
         }
 
-        /* 卡片设计 */
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 35px; }
+        /* ===== 区块布局 ===== */
+        .section {
+            padding: 120px clamp(24px, 6vw, 80px);
+            max-width: 1200px; margin: 0 auto;
+        }
+        .section-label {
+            font-size: 0.7rem; font-weight: 600; letter-spacing: 2px;
+            text-transform: uppercase; color: var(--primary-bright);
+            text-align: center; margin-bottom: 12px;
+        }
+        h2 {
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 800; color: var(--heading);
+            margin-bottom: 10px; text-align: center;
+            letter-spacing: -0.04em;
+        }
+        .section-subtitle {
+            text-align: center; color: var(--text-dim);
+            font-size: 0.95rem; margin-bottom: 64px;
+            letter-spacing: -0.1px; max-width: 500px;
+            margin-left: auto; margin-right: auto;
+        }
+
+        /* ===== 卡片网格 ===== */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+
         .card {
-            background: linear-gradient(145deg, #24283b, #1f2335);
-            padding: 45px;
-            border-radius: 28px;
-            border: 1px solid rgba(255,255,255,0.05);
-            transition: 0.5s cubic-bezier(0.23, 1, 0.32, 1);
-            position: relative;
+            background: var(--card);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 36px 32px; border-radius: 14px;
+            border: 1px solid var(--border);
+            position: relative; overflow: hidden;
+            opacity: 0; transform: translateY(30px);
+            transition: border-color 0.4s, box-shadow 0.4s;
+        }
+        .card.revealed {
+            opacity: 1; transform: translateY(0);
+            transition: opacity 0.8s cubic-bezier(0.22, 0.61, 0.36, 1),
+                        transform 0.8s cubic-bezier(0.22, 0.61, 0.36, 1);
         }
         .card:hover {
-            transform: translateY(-15px) scale(1.02);
-            border-color: var(--primary);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5), 0 0 20px var(--primary-glow);
+            border-color: var(--border-active);
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset,
+                        0 24px 60px rgba(0,0,0,0.5);
         }
-        .card h3 { color: #fff; font-size: 1.6rem; margin-top: 0; }
-        .card p { color: #a9b1d6; text-align: justify; }
+        /* 顶部微光 */
+        .card::before {
+            content: ''; position: absolute; top: 0; left: 10%; right: 10%; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(37,99,235,0.3), transparent);
+            opacity: 0; transition: opacity 0.4s; z-index: 3;
+        }
+        .card:hover::before { opacity: 1; }
+        /* 光标跟随光晕 */
+        .card-glow {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1; opacity: 0; pointer-events: none;
+            transition: opacity 0.35s; border-radius: 14px;
+        }
+        .card-inner { position: relative; z-index: 2; }
+        .card h3 {
+            color: var(--heading); font-size: 1.2rem;
+            font-weight: 700; margin-bottom: 8px; letter-spacing: -0.3px;
+        }
+        .card p { color: var(--text-dim); font-size: 0.88rem; line-height: 1.7; }
 
-        /* 技术磁贴模块 */
-        .tech-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; }
+        /* ===== 技术标签 ===== */
+        .tech-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
         .tech-tag {
-            background: rgba(122, 162, 247, 0.1);
-            color: var(--primary);
-            padding: 12px 28px;
-            border-radius: 100px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            border: 1px solid rgba(122, 162, 247, 0.2);
-            transition: 0.3s;
+            background: rgba(37,99,235,0.06);
+            color: var(--text); padding: 7px 16px;
+            border-radius: 6px; font-size: 0.78rem; font-weight: 500;
+            border: 1px solid rgba(37,99,235,0.12);
+            transition: all 0.3s; letter-spacing: -0.1px;
         }
         .tech-tag:hover {
-            background: var(--primary);
-            color: var(--bg);
-            box-shadow: 0 0 20px var(--primary-glow);
-            transform: scale(1.1);
+            background: rgba(37,99,235,0.14);
+            border-color: rgba(37,99,235,0.3);
+            color: #60a5fa;
         }
 
-        /* 实测数据展示 */
-        .stat-value { font-size: 3rem; font-weight: 800; color: #fff; margin: 15px 0; }
-        .stat-label { font-size: 0.9rem; color: var(--primary); text-transform: uppercase; font-weight: 700; letter-spacing: 1px; }
+        /* ===== 数据卡片 ===== */
+        .stat-card {
+            text-align: center; background: var(--card);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 40px 28px; border-radius: 14px;
+            border: 1px solid var(--border);
+            position: relative; overflow: hidden;
+            opacity: 0; transform: translateY(30px);
+            transition: border-color 0.4s, box-shadow 0.4s;
+        }
+        .stat-card.revealed {
+            opacity: 1; transform: translateY(0);
+            transition: opacity 0.8s cubic-bezier(0.22, 0.61, 0.36, 1),
+                        transform 0.8s cubic-bezier(0.22, 0.61, 0.36, 1);
+        }
+        .stat-card:hover {
+            border-color: var(--border-active);
+            box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+        }
+        .stat-card .card-glow {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1; opacity: 0; pointer-events: none;
+            transition: opacity 0.35s; border-radius: 14px;
+        }
+        .stat-card-inner { position: relative; z-index: 2; }
+        .stat-value {
+            font-size: 3.6rem; font-weight: 900;
+            color: var(--heading); letter-spacing: -0.04em;
+            line-height: 1; margin: 6px 0;
+        }
+        .stat-value span { font-size: 1.1rem; font-weight: 600; color: var(--text-dim); }
+        .stat-label {
+            font-size: 0.68rem; color: var(--text-dim);
+            text-transform: uppercase; font-weight: 600;
+            letter-spacing: 1px;
+        }
+        .stat-desc { color: var(--text-dim); font-size: 0.82rem; margin-top: 4px; }
 
-        /* 白皮书内容 */
+        /* ===== 白皮书 ===== */
         .whitepaper-box {
-            background: rgba(0,0,0,0.25);
-            padding: 50px;
-            border-radius: 30px;
-            border: 1px solid #414868;
+            background: var(--card); backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 48px 44px; border-radius: 14px;
+            border: 1px solid var(--border);
         }
-        .whitepaper-item { margin-bottom: 35px; }
-        .whitepaper-item strong { color: var(--accent); display: block; margin-bottom: 12px; font-size: 1.2rem; }
-        .whitepaper-item p { color: #a9b1d6; font-size: 1rem; text-align: justify; }
+        .whitepaper-item { margin-bottom: 30px; }
+        .whitepaper-item:last-child { margin-bottom: 0; }
+        .whitepaper-item strong {
+            color: var(--heading); display: block;
+            margin-bottom: 8px; font-size: 1rem;
+            font-weight: 700; letter-spacing: -0.2px;
+        }
+        .whitepaper-item p { color: var(--text-dim); font-size: 0.9rem; line-height: 1.75; }
 
-        /* 视频弹窗 Modal */
-        .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(15px); opacity: 0; transition: opacity 0.4s; }
+        /* ===== 图片框 ===== */
+        .img-frame {
+            text-align: center; background: rgba(15,23,42,0.5);
+            border-radius: 12px; padding: 16px 16px 12px;
+            border: 1px solid var(--border);
+            transition: border-color 0.4s;
+            opacity: 0; transform: translateY(30px);
+        }
+        .img-frame.revealed {
+            opacity: 1; transform: translateY(0);
+            transition: opacity 0.8s cubic-bezier(0.22, 0.61, 0.36, 1),
+                        transform 0.8s cubic-bezier(0.22, 0.61, 0.36, 1);
+        }
+        .img-frame:hover { border-color: var(--border-active); }
+        .img-frame img { width: 100%; border-radius: 4px; display: block; }
+        .img-frame .img-caption {
+            font-size: 0.7rem; color: var(--text-dim);
+            margin-top: 10px; font-weight: 500;
+            letter-spacing: 0.5px; text-transform: uppercase;
+        }
+
+        /* ===== 下载卡片 ===== */
+        .download-card {
+            max-width: 480px; margin: 0 auto; text-align: center;
+            background: var(--card); backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 42px 36px; border-radius: 14px;
+            border: 1px solid rgba(37,99,235,0.18);
+            box-shadow: 0 0 100px rgba(37,99,235,0.05);
+        }
+        .download-card h3 { color: var(--heading); font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; }
+        .extract-code {
+            display: inline-block; background: rgba(37,99,235,0.1);
+            color: #60a5fa; padding: 3px 12px;
+            border-radius: 5px; font-size: 0.8rem;
+            font-weight: 600; letter-spacing: 2px;
+            border: 1px solid rgba(37,99,235,0.2);
+        }
+
+        /* ===== Vision Lab ===== */
+        .vision-lab-card {
+            background: var(--card); backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(37,99,235,0.15);
+            border-radius: 14px; padding: 38px 36px; overflow: hidden;
+        }
+        .scanning-line {
+            position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+            background: linear-gradient(90deg,
+                transparent, rgba(37,99,235,0.5),
+                rgba(6,182,212,0.7), rgba(37,99,235,0.5),
+                transparent);
+            pointer-events: none;
+            animation: scanLine 3s ease-in-out infinite;
+        }
+        @keyframes scanLine {
+            0% { top: 0%; opacity: 0.2; }
+            50% { top: 100%; opacity: 0.85; }
+            100% { top: 100%; opacity: 0; }
+        }
+        .btn-active { background: #dc2626 !important; box-shadow: 0 0 20px rgba(220,38,38,0.35) !important; }
+
+        /* ===== Modal ===== */
+        .modal {
+            display: none; position: fixed; z-index: 9999;
+            left: 0; top: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            opacity: 0; transition: opacity 0.35s;
+        }
         .modal.show { opacity: 1; }
-        .modal-content { position: relative; margin: 8vh auto; width: 85%; max-width: 1000px; aspect-ratio: 16/9; background: #000; border-radius: 20px; overflow: hidden; box-shadow: 0 30px 60px rgba(0,0,0,0.8); transform: scale(0.9); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        .modal.show .modal-content { transform: scale(1); }
-        .close-btn { position: absolute; top: -50px; right: 0; color: #fff; font-size: 40px; cursor: pointer; }
+        .modal-dialog {
+            position: relative; margin: 8vh auto;
+            width: 88%; max-width: 1000px; aspect-ratio: 16/9;
+            background: #000; border-radius: 14px; overflow: hidden;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.8);
+            transform: scale(0.93);
+            transition: 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+        .modal.show .modal-dialog { transform: scale(1); }
+        .close-btn {
+            position: absolute; top: -40px; right: 0;
+            color: var(--text-dim); font-size: 32px;
+            cursor: pointer; transition: color 0.2s; line-height: 1;
+        }
+        .close-btn:hover { color: #fff; }
         .video-iframe { width: 100%; height: 100%; border: none; }
 
-        footer { text-align: center; padding: 70px 8%; border-top: 1px solid rgba(255,255,255,0.05); color: #565f89; font-size: 0.95rem; }
+        /* ===== Footer ===== */
+        footer {
+            text-align: center; padding: 56px 24px 36px;
+            border-top: 1px solid var(--border);
+            color: var(--text-dim); font-size: 0.72rem;
+        }
+        footer p { margin: 0; }
+        footer p + p { margin-top: 4px; }
+
+        #skeleton-overlay { display: none; }
 
         @media (max-width: 768px) {
-            h1 { font-size: 2.8rem; }
-            .btn-outline { margin-left: 0; margin-top: 18px; width: 100%; box-sizing: border-box; }
-            .btn-primary { width: 100%; box-sizing: border-box; }
-        }
-
-                /* 视频扫描线动画 */
-        .scanning-line {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: linear-gradient(to bottom, transparent, var(--primary), transparent);
-            opacity: 0.4;
-            pointer-events: none;
-            animation: scan 3s linear infinite;
-        }
-
-        @keyframes scan {
-            0% { top: 0%; }
-            100% { top: 100%; }
-        }
-
-        /* 按钮点击后的状态切换 */
-        .btn-active {
-            background: #ff757f !important; /* 变成红色代表关闭 */
-            box-shadow: 0 0 20px rgba(255, 117, 127, 0.4) !important;
-        }
-
-        #skeleton-overlay {
-            /* 初始状态隐藏，开启摄像头后再显示 */
-            display: none;
+            .card { padding: 24px 20px; }
+            .whitepaper-box { padding: 22px 18px; }
+            .modal-dialog { width: 96%; }
+            .vision-lab-card { padding: 20px 16px; }
+            .stat-value { font-size: 2.6rem; }
         }
     </style>
 </head>
 <body>
+<canvas id="particles-bg"></canvas>
 
 <nav>
     <div class="logo">[EMS] PROJECT</div>
@@ -254,309 +410,410 @@
         <a href="#model-results" class="nav-item">模型分析</a>
         <a href="#vision-lab" class="nav-item">在线演示</a>
         <a href="#whitepaper" class="nav-item">技术白皮书</a>
-        <a href="#download" class="nav-item" style="color: var(--accent);">软件下载</a>
+        <a href="#download" class="nav-item" style="color:#60a5fa;">下载</a>
     </div>
 </nav>
 
-<header class="fade-in-up">
-    <h1>极速感知，温情守护</h1>
-    <p class="tagline">基于边缘AI与轻量化 YOLOv8n-Pose 的高精度跌倒监测终端。专为独居长者设计，独创「毫秒级视觉识别 + 适老化自然语义交互」双重过滤机制，在保障隐私的同时，重塑居家养老的安全标准。</p>
+<header>
+    <div class="hero-bg-orb"></div>
+    <div class="hero-grid"></div>
+    <div class="hero-label">Edge-AI Fall Detection System</div>
+    <h1>极速感知<br>温情守护</h1>
+    <p class="tagline">基于边缘AI与轻量化 YOLOv8n-Pose 的高精度跌倒监测终端。独创「毫秒级视觉识别 + 适老化自然语义交互」双重过滤机制，重塑居家养老的安全标准。</p>
     <div class="hero-btns">
-        <a href="https://gitee.com/r05e/elder_-monitor_-system.git" target="_blank" class="btn btn-primary">💻 查看 Gitee 源码</a>
-        <button onclick="openVideo()" class="btn btn-outline">🎬 观看演示视频</button>
+        <a href="https://gitee.com/r05e/elder_-monitor_-system.git" target="_blank" rel="noopener noreferrer" class="btn btn-primary">查看 Gitee 源码</a>
+        <button onclick="openVideo()" class="btn btn-outline">观看演示视频</button>
     </div>
 </header>
 
-<section class="section fade-in-up" id="download">
-    <h2>📦 完整部署包下载 (v8.0)</h2>
-    <div class="card" style="max-width: 600px; margin: 0 auto; text-align: center; border: 1px solid var(--primary-glow); box-shadow: 0 15px 35px rgba(0,0,0,0.4), 0 0 20px var(--primary-glow);">
-        <h3 style="margin-top: 0; color: #fff; font-size: 1.8rem;">EMS_Setup_v8.0.exe</h3>
-        <p style="color: #a9b1d6; font-size: 15px; margin-bottom: 30px;">
-            文件大小: 约 1 GB | 包含微调权重及完整依赖环境
-        </p>
-
-        <a href="https://pan.baidu.com/s/1TmwiFEsBR8qphrQJNk7dgQ?pwd=0924" target="_blank" class="btn btn-primary" style="padding: 16px 40px; font-size: 1.1rem; display: inline-block; width: 70%;">
-            🚀 前往百度网盘下载
-        </a>
-
-        <div style="margin-top: 25px; font-size: 16px; color: #c0caf5; font-weight: 600;">
-            🔑 提取码:
-            <span style="background: rgba(158, 238, 106, 0.15); color: var(--accent); padding: 6px 16px; border-radius: 8px; border: 1px solid var(--accent); margin-left: 10px; letter-spacing: 2px;">
-                0924
-            </span>
+<section class="section" id="download">
+    <div class="section-label">Download</div>
+    <h2>完整部署包</h2>
+    <p class="section-subtitle">EMS v8.0 · 开箱即用的边缘AI跌倒监测套件</p>
+    <div class="download-card">
+        <h3>EMS_Setup_v8.0.exe</h3>
+        <p style="color:var(--text-dim);font-size:0.86rem;margin-bottom:24px;">约 1 GB · 含微调权重及完整依赖环境</p>
+        <a href="https://pan.baidu.com/s/1TmwiFEsBR8qphrQJNk7dgQ?pwd=0924" target="_blank" rel="noopener noreferrer" class="btn btn-primary">前往百度网盘下载</a>
+        <div style="margin-top:20px;font-size:0.86rem;">
+            提取码 <span class="extract-code">0924</span>
         </div>
-        <p style="margin-top: 20px; font-size: 0.85rem; color: #565f89; opacity: 0.8;">
-            * 下载后直接运行安装程序，按提示完成边缘端与主控端的环境部署。
-        </p>
+        <p style="margin-top:14px;font-size:0.7rem;color:var(--text-dim);">下载后运行安装程序，按提示完成环境部署</p>
     </div>
 </section>
 
-<section class="section fade-in-up" id="features">
-    <h2>✨ 核心系统亮点</h2>
+<section class="section" id="features">
+    <div class="section-label">Features</div>
+    <h2>核心系统亮点</h2>
+    <p class="section-subtitle">专为独居长者设计的全栈智能监护方案</p>
     <div class="grid">
-        <div class="card">
-            <h3>🏃 毫秒级姿态解析</h3>
-            <p>基于轻量化 YOLOv8-Pose 模型，实时提取人体 17 处骨骼关键点。独创「空间倾角 + 包围框宽高比」双重校验逻辑，在光照多变、遮挡等复杂场景下依然保持极高检出率。</p>
+        <div class="card" data-delay="0">
+            <div class="card-glow"></div>
+            <div class="card-inner">
+                <h3>毫秒级姿态解析</h3>
+                <p>基于轻量化 YOLOv8-Pose 模型，实时提取人体 17 处骨骼关键点。独创「空间倾角 + 包围框宽高比」双重校验逻辑，复杂场景下保持极高检出率。</p>
+            </div>
         </div>
-        <div class="card">
-            <h3>🎙️ 适老化语义交互</h3>
-            <p>搭载边缘端语音合成与识别模块。捕捉到疑似跌倒后，系统主动发起语音问询，通过自然语言解析判定长者真实风险状态，从根源上解决传统设备“误报率高”的痛点。</p>
+        <div class="card" data-delay="80">
+            <div class="card-glow"></div>
+            <div class="card-inner">
+                <h3>适老化语义交互</h3>
+                <p>搭载边缘端语音合成与识别模块。捕捉到疑似跌倒后，系统主动发起语音问询，通过自然语言解析判定真实风险状态，从根本上解决传统设备误报率高的痛点。</p>
+            </div>
         </div>
-        <div class="card">
-            <h3>🚨 闭环式救援网络</h3>
-            <p>构建云边协同的四维报警链路。毫秒级触发本地声光警示反馈，并无缝衔接发送 SOS E-Mail 到预设紧急联系人，内含跌倒者跌倒状态捕捉确保生命救援信息 100% 触达。</p>
+        <div class="card" data-delay="160">
+            <div class="card-glow"></div>
+            <div class="card-inner">
+                <h3>闭环式救援网络</h3>
+                <p>构建云边协同的四维报警链路。毫秒级触发本地声光警示反馈，无缝衔接发送 SOS E-Mail 到预设紧急联系人，确保生命救援信息 100% 触达。</p>
+            </div>
         </div>
     </div>
 </section>
 
-<section class="section fade-in-up" id="tech-stack">
-    <h2>🛠️ 项目技术栈 (Tech Stack)</h2>
+<section class="section" id="tech-stack">
+    <div class="section-label">Tech Stack</div>
+    <h2>项目技术栈</h2>
+    <p class="section-subtitle">从边缘推理到云端分发的全链路技术选型</p>
     <div class="tech-tags">
-        <div class="tech-tag">YOLOv8n-Pose</div>
-        <div class="tech-tag">NVIDIA TensorRT</div>
-        <div class="tech-tag">PySide6</div>
-        <div class="tech-tag">CVAT</div>
-        <div class="tech-tag">OpenCV</div>
-        <div class="tech-tag">Anaconda3</div>
-        <div class="tech-tag">pytorch</div>
-        <div class="tech-tag">CUDA / FP16</div>
-        <div class="tech-tag">Linux / Jetson</div>
-        <div class="tech-tag">Python 3.10</div>
-        <div class="tech-tag">Whisper-fast</div>
-        <div class="tech-tag">GPIO Control</div>
-        <div class="tech-tag">pyttsx3</div>
-        <div class="tech-tag">piper </div>
+        <span class="tech-tag">YOLOv8n-Pose</span><span class="tech-tag">NVIDIA TensorRT</span>
+        <span class="tech-tag">PySide6</span><span class="tech-tag">CVAT</span>
+        <span class="tech-tag">OpenCV</span><span class="tech-tag">PyTorch</span>
+        <span class="tech-tag">CUDA / FP16</span><span class="tech-tag">Linux / Jetson</span>
+        <span class="tech-tag">Python 3.10</span><span class="tech-tag">faster-whisper</span>
+        <span class="tech-tag">GPIO Control</span><span class="tech-tag">pyttsx3</span><span class="tech-tag">piper</span>
     </div>
 </section>
 
-<section class="section fade-in-up" id="live-data">
-    <h2>📊 边缘计算端实测数据</h2>
-    <div class="grid" style="text-align: center;">
-        <div class="card">
-            <div class="stat-label">NVIDIA Jetson Nano</div>
-            <div class="stat-value">18 <span style="font-size: 1.2rem;">FPS</span></div>
-            <p>实时推理帧率 (FP16+TRT加速)</p>
+<section class="section" id="live-data">
+    <div class="section-label">Performance</div>
+    <h2>边缘计算端实测数据</h2>
+    <p class="section-subtitle">NVIDIA Jetson Nano · FP16 + TensorRT 加速</p>
+    <div class="grid">
+        <div class="stat-card" data-delay="0">
+            <div class="card-glow"></div>
+            <div class="stat-card-inner">
+                <div class="stat-label">Inference Speed</div>
+                <div class="stat-value" data-target="18">0 <span>FPS</span></div>
+                <p class="stat-desc">实时推理帧率</p>
+            </div>
         </div>
-        <div class="card">
-            <div class="stat-label">System Latency</div>
-            <div class="stat-value">55 <span style="font-size: 1.2rem;">ms</span></div>
-            <p>端到端处理时延</p>
+        <div class="stat-card" data-delay="100">
+            <div class="card-glow"></div>
+            <div class="stat-card-inner">
+                <div class="stat-label">End-to-End Latency</div>
+                <div class="stat-value" data-target="55">0 <span>ms</span></div>
+                <p class="stat-desc">端到端处理时延</p>
+            </div>
         </div>
-        <div class="card">
-            <div class="stat-label">Alarm Reliability</div>
-            <div class="stat-value">100%</div>
-            <p>紧急E-MAIL短信触达率</p>
+        <div class="stat-card" data-delay="200">
+            <div class="card-glow"></div>
+            <div class="stat-card-inner">
+                <div class="stat-label">Alarm Reliability</div>
+                <div class="stat-value" data-target="100">0<span>%</span></div>
+                <p class="stat-desc">紧急邮件触达率</p>
+            </div>
         </div>
     </div>
 </section>
 
-<section class="section fade-in-up" id="whitepaper">
-    <h2>📄 技术白皮书 (Technical Overview)</h2>
+<section class="section" id="whitepaper">
+    <div class="section-label">Whitepaper</div>
+    <h2>技术白皮书</h2>
+    <p class="section-subtitle">Technical Overview</p>
     <div class="whitepaper-box">
         <div class="whitepaper-item">
-            <strong>1. “云-边-端”协同分布式架构 (Edge-Cloud Collaboration)</strong>
-            <p>系统采用“云-边-端”异构架构设计。边缘端（NVIDIA Jetson）作为算力底座，实现视频流本地闭环处理，坚守“隐私不出门”的底线；本地终端负责调试设备，更新信息，实现实时监控；云端则负责异步高并发警报分发，确保在各种网络环境下具备灾备级的数据能力。</p>
+            <strong>1. "云-边-端"协同分布式架构</strong>
+            <p>系统采用"云-边-端"异构架构设计。边缘端（NVIDIA Jetson）作为算力底座，实现视频流本地闭环处理，坚守"隐私不出门"的底线；本地终端负责调试与实时监控；云端负责异步高并发警报分发，确保灾备级的数据可靠性。</p>
         </div>
         <div class="whitepaper-item">
-            <strong>2. 异构计算引擎与算子融合 (Optimization)</strong>
-            <p>针对嵌入式设备算力瓶颈，深度集成 TensorRT 进行全链路优化。通过算子融合及 FP16 半精度推理技术，将推理效率提升约 45%，成功在有限算力下实现了监控级的流畅度。</p>
+            <strong>2. 异构计算引擎与算子融合</strong>
+            <p>针对嵌入式设备算力瓶颈，深度集成 TensorRT 进行全链路优化。通过算子融合及 FP16 半精度推理技术，将推理效率提升约 45%，成功在有限算力下实现监控级流畅度。</p>
         </div>
         <div class="whitepaper-item">
-            <strong>3. 隐私安全保护机制 (Privacy-Preserving)</strong>
-            <p>系统仅在边缘侧内存中进行瞬时特征提取，处理后即刻销毁原始画面，不存储、不上传任何隐私图像。仅输出脱敏后的结构化报警信息，从根本上消除了长者对视觉监控的顾虑。</p>
+            <strong>3. 隐私安全保护机制</strong>
+            <p>系统仅在边缘侧内存中进行瞬时特征提取，处理后即刻销毁原始画面，不存储、不上传任何隐私图像。仅输出脱敏后的结构化报警信息，从根本上消除长者对视觉监控的顾虑。</p>
         </div>
     </div>
 </section>
 
-<section class="section fade-in-up" id="model-results">
-    <h2>📊 模型训练成果 (Training Analysis)</h2>
+<section class="section" id="model-results">
+    <div class="section-label">Training Analysis</div>
+    <h2>模型训练成果</h2>
+    <p class="section-subtitle">自建跌倒数据集 · 50 轮迁移学习 · mAP50 = 0.85</p>
     <div class="whitepaper-box">
         <div class="grid">
-            <div style="text-align: center;">
-                <p class="stat-label">Precision-Recall 曲线</p>
-                <img src="assets/images/Results.png" alt="训练曲线" style="width: 100%; border-radius: 15px; margin-top: 15px; border: 1px solid rgba(122, 162, 247, 0.3);">
+            <div class="img-frame" data-delay="0">
+                <div class="img-caption">Precision-Recall 曲线</div>
+                <img src="assets/images/Results.png" alt="训练曲线" loading="lazy">
             </div>
-            <div style="text-align: center;">
-                <p class="stat-label">归一化混淆矩阵</p>
-                <img src="assets/images/confusion_matrix.png.png" alt="混淆矩阵" style="width: 100%; border-radius: 15px; margin-top: 15px; border: 1px solid rgba(122, 162, 247, 0.3);">
+            <div class="img-frame" data-delay="120">
+                <div class="img-caption">归一化混淆矩阵</div>
+                <img src="assets/images/confusion_matrix.png.png" alt="混淆矩阵" loading="lazy">
             </div>
         </div>
-        <div style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 30px;">
-            <div class="whitepaper-item">
-                <strong>📈 训练结论分析</strong>
-                <p>经过 50 轮次的深度迁移学习优化，模型在自建跌倒数据集上的各项核心指标均取得突破性进展，全类平均精度（mAP50）达到 0.85。实验结果表明，模型已具备极高的姿态辨识能力与鲁棒性。</p>
+        <div style="margin-top:36px;border-top:1px solid var(--border);padding-top:26px;">
+            <div class="whitepaper-item" style="margin-bottom:0;">
+                <strong>训练结论分析</strong>
+                <p>经过 50 轮次的深度迁移学习优化，模型在自建跌倒数据集上的各项核心指标均取得突破性进展，全类平均精度（mAP50）达到 0.85，已具备极高的姿态辨识能力与鲁棒性。</p>
             </div>
         </div>
     </div>
 </section>
 
-<section class="section fade-in-up" id="vision-lab">
-    <div class="card" style="border: 1px solid var(--primary-glow); overflow: hidden;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 20px;">
-            <div style="text-align: left;">
-                <h3 style="margin: 0;">🛡️ 边缘感知实验室 (Edge-AI Lab)</h3>
-                <p style="font-size: 0.85rem; color: #565f89; margin: 5px 0 0 0;">
-                    Status: <span id="camera-status" style="color: var(--primary);">Standby</span>
-                </p>
+<section class="section" id="vision-lab">
+    <div class="section-label">Edge-AI Lab</div>
+    <h2>边缘感知实验室</h2>
+    <p class="section-subtitle">网页端实时预览 · 边缘终端完成高精度推理</p>
+    <div class="vision-lab-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:14px;">
+            <div>
+                <div style="font-size:0.76rem;color:var(--text-dim);">
+                    Status: <span id="camera-status" style="color:#3b82f6;">Standby</span>
+                </div>
             </div>
-
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <p style="font-size: 0.8rem; color: #a9b1d6; max-width: 260px; text-align: right; line-height: 1.4; opacity: 0.8;">
-                    💡 网页端仅供预览，高精度推理由边缘计算终端完成，结果通过 Socket 同步。
-                </p>
-                <button onclick="toggleWebcam()" id="webcam-btn" class="btn btn-primary" style="padding: 12px 25px;">
-                    ⚡ 开启视觉感知
-                </button>
-            </div>
+            <button onclick="toggleWebcam()" id="webcam-btn" class="btn btn-primary" style="padding:10px 18px;font-size:0.8rem;">
+                开启视觉感知
+            </button>
         </div>
-
-        <div id="webcam-container" style="display: none; position: relative; width: 100%; max-width: 800px; margin: 0 auto; border-radius: 20px; overflow: hidden; border: 2px solid #414868;">
-
-            <video id="webcam-view" autoplay playsinline style="width: 100%; display: block; transform: scaleX(-1); background: #000;"></video>
-
-            <img src="assets/skeleton_overlay.gif" id="skeleton-overlay"
-                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; opacity: 0.7; transform: scaleX(-1); mix-blend-mode: screen;">
-
+        <div id="webcam-container" style="display:none;position:relative;width:100%;max-width:800px;margin:0 auto;border-radius:10px;overflow:hidden;border:1px solid var(--border-active);">
+            <video id="webcam-view" autoplay playsinline style="width:100%;display:block;transform:scaleX(-1);background:#000;"></video>
+            <img src="assets/skeleton_overlay.gif" id="skeleton-overlay" alt="骨骼姿态叠加层"
+                 style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;pointer-events:none;opacity:0.7;transform:scaleX(-1);mix-blend-mode:screen;">
             <div class="scanning-line"></div>
-
-            <div style="position: absolute; top: 20px; left: 20px; font-family: monospace; color: var(--accent); font-size: 0.8rem; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 4px;">
-                REC [00:24:59] | AI_INFERENCE: ACTIVE
+            <div style="position:absolute;top:12px;left:12px;font-family:'SF Mono','Fira Code',monospace;color:#06b6d4;font-size:0.66rem;background:rgba(0,0,0,0.55);padding:3px 8px;border-radius:4px;letter-spacing:0.4px;">
+                REC · AI_INFERENCE: ACTIVE
             </div>
         </div>
     </div>
 </section>
 
 <footer>
-    <p>&copy; 2026 [EMS] Project Group | 中国大学生计算机设计大赛参赛作品</p>
-    <p style="margin-top: 10px; opacity: 0.5;">部署于 Vercel · 加速节点: cname-china.vercel-dns.com</p>
+    <p>&copy; 2026 [EMS] Project Group · 中国大学生计算机设计大赛参赛作品</p>
+    <p>Deployed on Vercel</p>
 </footer>
 
 <div id="videoModal" class="modal">
-    <div style="position: relative; width: 85%; max-width: 1000px; margin: 8vh auto;">
-        <span class="close-btn" onclick="closeVideo()">&times;</span>
-        <div class="modal-content">
-            <iframe id="demoVideo" class="video-iframe" src="" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>
-        </div>
+    <div class="modal-dialog" style="margin:8vh auto;position:relative;">
+        <span class="close-btn" onclick="closeVideo()" aria-label="关闭视频">&times;</span>
+        <iframe id="demoVideo" class="video-iframe" src="" allow="autoplay" allowfullscreen></iframe>
     </div>
 </div>
 
 <script>
-    /* 滚动淡入逻辑 */
-    const observer = new IntersectionObserver((entries) => {
+    /* ══════════════════════════════════════
+       粒子 — 科技蓝光点 + 细线网络
+       ══════════════════════════════════════ */
+    (function() {
+        const canvas = document.getElementById('particles-bg');
+        const ctx = canvas.getContext('2d');
+        let dots = [], w, h, animId;
+
+        function resize() {
+            w = canvas.width = window.innerWidth;
+            h = canvas.height = window.innerHeight;
+        }
+
+        class Dot {
+            constructor() { this.reset(true); }
+            reset(initial) {
+                this.x = Math.random() * w;
+                this.y = initial ? Math.random() * h : -20;
+                this.r = Math.random() * 1.4 + 0.4;
+                this.vy = Math.random() * 0.28 + 0.06;
+                this.vx = (Math.random() - 0.5) * 0.12;
+                this.alpha = Math.random() * 0.35 + 0.08;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                if (this.y > h + 20) { this.reset(false); this.y = -20; }
+                if (this.x < -20) this.x = w + 20;
+                if (this.x > w + 20) this.x = -20;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(148,163,184,${this.alpha})`;
+                ctx.fill();
+            }
+        }
+
+        function init(count) {
+            dots = [];
+            for (let i = 0; i < count; i++) dots.push(new Dot());
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, w, h);
+            dots.forEach(d => { d.update(); d.draw(); });
+
+            // 近距连线
+            for (let i = 0; i < dots.length; i++) {
+                for (let j = i + 1; j < dots.length; j++) {
+                    const dx = dots[i].x - dots[j].x;
+                    const dy = dots[i].y - dots[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 100) {
+                        ctx.beginPath();
+                        ctx.moveTo(dots[i].x, dots[i].y);
+                        ctx.lineTo(dots[j].x, dots[j].y);
+                        ctx.strokeStyle = `rgba(148,163,184,${0.05 * (1 - dist / 100)})`;
+                        ctx.lineWidth = 0.4;
+                        ctx.stroke();
+                    }
+                }
+            }
+            animId = requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', () => { resize(); init(Math.floor(w * h / 14000)); });
+        resize(); init(Math.floor(w * h / 14000)); animate();
+    })();
+
+    /* ══════════════════════════════════════
+       卡片 3D 追踪悬停
+       ══════════════════════════════════════ */
+    function bindTilt(el) {
+        const glow = el.querySelector('.card-glow');
+        let raf = null;
+        el.addEventListener('mouseenter', () => {
+            el.style.transition = 'border-color 0.4s, box-shadow 0.4s, transform 0.1s ease-out';
+        });
+        el.addEventListener('mousemove', (e) => {
+            if (raf) return;
+            raf = requestAnimationFrame(() => {
+                raf = null;
+                const r = el.getBoundingClientRect();
+                const rx = (e.clientY - r.top - r.height / 2) / (r.height / 2);
+                const ry = (e.clientX - r.left - r.width / 2) / (r.width / 2);
+                el.style.transform = `perspective(700px) rotateX(${rx * -5}deg) rotateY(${ry * 5}deg) translateY(-2px)`;
+                if (glow) {
+                    glow.style.opacity = '1';
+                    glow.style.background = `radial-gradient(circle 250px at ${e.clientX - r.left}px ${e.clientY - r.top}px, rgba(37,99,235,0.08) 0%, transparent 60%)`;
+                }
+            });
+        });
+        el.addEventListener('mouseleave', () => {
+            el.style.transition = 'border-color 0.4s, box-shadow 0.4s, transform 0.55s cubic-bezier(0.23, 1, 0.32, 1)';
+            el.style.transform = 'perspective(700px) rotateX(0deg) rotateY(0deg) translateY(0px)';
+            if (glow) { glow.style.opacity = '0'; glow.style.background = ''; }
+        });
+    }
+    document.querySelectorAll('.card, .stat-card').forEach(bindTilt);
+
+    /* ══════════════════════════════════════
+       滚动入场
+       ══════════════════════════════════════ */
+    const revealObs = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
-                entry.target.classList.add('visible');
+                const d = parseInt(entry.target.dataset.delay) || 0;
+                setTimeout(() => entry.target.classList.add('revealed'), d);
+                revealObs.unobserve(entry.target);
             }
         });
-    }, { threshold: 0.1 });
-    document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.card, .stat-card, .img-frame').forEach(el => revealObs.observe(el));
 
-    /* 视频控制逻辑 */
+    /* ══════════════════════════════════════
+       数字递增
+       ══════════════════════════════════════ */
+    const countObs = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const el = entry.target;
+                const target = parseInt(el.dataset.target);
+                const suffixEl = el.querySelector('span');
+                const suffix = suffixEl ? suffixEl.textContent : '';
+                const start = performance.now();
+                const dur = 2000;
+                (function tick(now) {
+                    const p = Math.min((now - start) / dur, 1);
+                    const eased = 1 - Math.pow(1 - p, 4);
+                    const cur = Math.round(target * eased);
+                    el.innerHTML = cur + (suffix ? ' <span>' + suffix + '</span>' : '');
+                    if (p < 1) requestAnimationFrame(tick);
+                    else el.innerHTML = target + (suffix ? ' <span>' + suffix + '</span>' : '');
+                })(start);
+                countObs.unobserve(el);
+            }
+        });
+    }, { threshold: 0.3 });
+    document.querySelectorAll('.stat-value').forEach(el => countObs.observe(el));
+
+    /* ══════════════════════════════════════
+       Hero 光球视差 + 网格透明度跟随滚动
+       ══════════════════════════════════════ */
+    (function() {
+        const orb = document.querySelector('.hero-bg-orb');
+        const grid = document.querySelector('.hero-grid');
+        if (!orb) return;
+        let ticking = false;
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    const sy = window.scrollY;
+                    orb.style.transform = `translate(-50%, -50%) translateY(${sy * 0.05}px)`;
+                    if (grid) grid.style.opacity = Math.max(0, 1 - sy / 600);
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        }, { passive: true });
+    })();
+
+    /* ══════════════════════════════════════
+       视频弹窗
+       ══════════════════════════════════════ */
     const modal = document.getElementById('videoModal');
     const iframe = document.getElementById('demoVideo');
-    const biliBvid = "BV1pK9QBUEH2"; // 已更新为您的 BV 号
-
     function openVideo() {
         modal.style.display = 'block';
-        setTimeout(() => modal.classList.add('show'), 10);
-        iframe.src = `//player.bilibili.com/player.html?isOutside=true&bvid=${biliBvid}&autoplay=1`;
+        requestAnimationFrame(() => requestAnimationFrame(() => modal.classList.add('show')));
+        iframe.src = '//player.bilibili.com/player.html?isOutside=true&bvid=BV1pK9QBUEH2&autoplay=1';
     }
-
     function closeVideo() {
         modal.classList.remove('show');
-        setTimeout(() => {
-            modal.style.display = 'none';
-            iframe.src = "";
-        }, 400);
+        setTimeout(() => { modal.style.display = 'none'; iframe.src = ''; }, 400);
     }
+    window.addEventListener('click', e => { if (e.target === modal) closeVideo(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.classList.contains('show')) closeVideo(); });
 
-    window.onclick = function(event) {
-        if (event.target == modal) { closeVideo(); }
-    }
-        /* 摄像头实时演示逻辑 */
+    /* ══════════════════════════════════════
+       摄像头
+       ══════════════════════════════════════ */
     let stream = null;
     const webcamContainer = document.getElementById('webcam-container');
-    const video = document.getElementById('webcam-view');
+    const videoEl = document.getElementById('webcam-view');
     const statusText = document.getElementById('camera-status');
-
+    function stopWebcam() {
+        if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; videoEl.srcObject = null; }
+        webcamContainer.style.display = 'none';
+    }
     async function toggleWebcam() {
+        const btn = document.getElementById('webcam-btn');
+        const overlay = document.getElementById('skeleton-overlay');
         if (stream) {
-            // 关闭逻辑
             stopWebcam();
+            btn.innerText = '开启视觉感知'; btn.classList.remove('btn-active');
+            overlay.style.display = 'none';
+            statusText.innerText = 'Standby'; statusText.style.color = '#3b82f6';
             return;
         }
-
-        // 开启逻辑
         webcamContainer.style.display = 'block';
-        statusText.innerText = "正在请求权限...";
-
+        statusText.innerText = '正在请求权限...';
         try {
-            // 检测硬件支持
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                throw new Error("您的浏览器不支持 WebRTC 硬件访问");
-            }
-
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 640, height: 480, facingMode: "user" },
-                audio: false
-            });
-
-            video.srcObject = stream;
-            statusText.innerText = "● 视觉模块已就绪 (LOCAL_PREVIEW)";
-            statusText.style.color = "var(--accent)";
-
-            // 此处可以加入 tfjs-models/pose-detection 来实现真实的网页端骨架绘制
-            // 如果只是为了比赛演示效果，可以先展示原生预览图
-
+            if (!navigator.mediaDevices?.getUserMedia) throw new Error('浏览器不支持 WebRTC');
+            stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, facingMode: 'user' }, audio: false });
+            videoEl.srcObject = stream;
+            overlay.style.display = 'block';
+            btn.innerText = '停止感知模块'; btn.classList.add('btn-active');
+            statusText.innerText = '● LIVE'; statusText.style.color = '#06b6d4';
         } catch (err) {
-            statusText.innerText = "❌ 硬件异常: " + (err.name === 'NotAllowedError' ? "权限被拒绝" : "未检测到可用设备");
-            statusText.style.color = "#ff757f";
-            console.error(err);
-        }
-    }
-
-    function stopWebcam() {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            stream = null;
-            video.srcObject = null;
+            statusText.innerText = err.name === 'NotAllowedError' ? '权限被拒绝' : (err.message || '设备异常');
+            statusText.style.color = '#dc2626';
             webcamContainer.style.display = 'none';
         }
     }
-    async function toggleWebcam() {
-    const btn = document.getElementById('webcam-btn');
-    const overlay = document.getElementById('skeleton-overlay');
-
-    if (stream) {
-        stopWebcam();
-        btn.innerText = "⚡ 开启视觉感知";
-        btn.classList.remove('btn-active');
-        overlay.style.display = 'none';
-        return;
-    }
-
-    try {
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: 1280, height: 720 },
-            audio: false
-        });
-
-        webcamContainer.style.display = 'block';
-        video.srcObject = stream;
-
-        // 关键逻辑：开启摄像头后展示骨骼叠加层
-        overlay.style.display = 'block';
-
-        btn.innerText = "🛑 停止感知模块";
-        btn.classList.add('btn-active');
-        statusText.innerText = "● LIVE: EDGE_INFERENCE_SYNCED";
-        statusText.style.color = "var(--accent)";
-
-    } catch (err) {
-        alert("无法访问摄像头: " + err.message);
-    }
-}
 </script>
-
 </body>
 </html>

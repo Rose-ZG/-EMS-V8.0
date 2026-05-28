@@ -11,18 +11,17 @@ from ultralytics import YOLO
 
 from modules.logger import Logger
 from modules._resource import resource_path
-from voice_assistant import VoiceAssistant
+from modules.voice_assistant import VoiceAssistant
 
 class VideoWorker(QThread):
     #信号：图像、是否跌倒、FPS
-    change_pixmap_signal = Signal(QImage, bool, float)
+    change_pixmap_signal=Signal(QImage, bool, float)
     #numpy.ndarray类型用于传递图像数据
-    emergency_call_signal = Signal(np.ndarray)
-    #即使预警与复位信号
-    pre_alarm_signal = Signal()
-    cancel_alarm_signal = Signal()
+    emergency_call_signal=Signal(np.ndarray)
+    #即时预警与复位信号
+    pre_alarm_signal=Signal()
+    cancel_alarm_signal=Signal()
 
-    #测试数据集模型runs/pose/fall_detect4/weights/best.pt
     def __init__(self, model_path=None, debug=False):
         super().__init__()
         self.debug = debug
@@ -30,7 +29,7 @@ class VideoWorker(QThread):
         if model_path is None:
             model_path = resource_path('yolov8n-pose.pt')
 
-        # 1. 加载视觉模型（回退机制）
+        #加载视觉模型（回退机制）
         if not os.path.exists(model_path):
             fallback = resource_path('yolov8n-pose.pt')
             self._log(lambda log: log.warn(f"模型 {model_path} 未找到，回退到 {fallback}"))
@@ -42,10 +41,10 @@ class VideoWorker(QThread):
             self._log(lambda log: log.error(f"模型加载失败: {e}"))
             self.model = None
 
-        # 2. 初始化语音助手
+        #初始化语音助手
         self.assistant = VoiceAssistant()
 
-        # 3. 运行参数
+        #运行参数
         self.running = True
         self.is_interacting = False
         self.is_alarming = False
@@ -106,21 +105,21 @@ class VideoWorker(QThread):
         if not results or len(results) == 0:
             return 0.0
 
-        # 阈值配置
+        #阈值配置
         kp_conf_thresh = getattr(self, 'kp_conf_threshold', 0.5)
         kp_ratio_thresh = getattr(self, 'kp_ratio_threshold', 1.0)
         angle_thresh = getattr(self, 'angle_threshold', 45)
 
-        # COCO 关键点索引
-        LSHO, RSHO = 5, 6
-        LHIP, RHIP = 11, 12
-        LKNE, RKNE = 13, 14
-        LANK, RANK = 15, 16
+        #COCO关键点索引
+        LSHO,RSHO=5,6
+        LHIP,RHIP=11,12
+        LKNE,RKNE=13,14
+        LANK,RANK=15,16
 
         for r in results:
             if r.boxes is None or r.keypoints is None:
                 continue
-            frame_h = r.orig_shape[0]
+            frame_h=r.orig_shape[0]
 
             for i, box in enumerate(r.boxes):
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
@@ -212,7 +211,7 @@ class VideoWorker(QThread):
                 # ── 阶段3: 角度规则确认 ──
                 person_score = 0.50  # 通过阶段1+2的基础分
 
-                # 6.1 大腿与水平面夹角
+                #大腿与水平面夹角
                 def _thigh_horizontal(hip_i, knee_i):
                     if not (kps[hip_i][2] > kp_conf_thresh and kps[knee_i][2] > kp_conf_thresh):
                         return False
@@ -223,7 +222,7 @@ class VideoWorker(QThread):
                     cos_a = abs(vec[0]) / norm_v
                     return np.degrees(np.arccos(np.clip(cos_a, -1, 1))) < angle_thresh
 
-                # 6.2 躯干-大腿夹角（髋部折叠）
+                #躯干-大腿夹角（髋部折叠）
                 def _torso_thigh(hip_i, knee_i):
                     if not (sho_ok and hip_ok and kps[knee_i][2] > kp_conf_thresh):
                         return False
@@ -235,7 +234,7 @@ class VideoWorker(QThread):
                     cos_a = np.dot(torso, thigh) / (nt * nf)
                     return np.degrees(np.arccos(np.clip(cos_a, -1, 1))) < angle_thresh
 
-                # 6.3 大腿-小腿夹角（膝部折叠）
+                #大腿-小腿夹角（膝部折叠）
                 def _thigh_shin(hip_i, knee_i, ankle_i):
                     if not (kps[hip_i][2] > kp_conf_thresh
                             and kps[knee_i][2] > kp_conf_thresh

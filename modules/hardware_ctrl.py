@@ -9,7 +9,7 @@ class HardwareManager:
         self.ser = None
         self.os_type = platform.system()
 
-        # 自动检测并连接可用串口
+        #自动检测并连接可用串口
         port = port or self._auto_detect_serial()
         if port:
             try:
@@ -42,8 +42,8 @@ class HardwareManager:
         return False
 
     def alert_with_voice(self, active=True):
-        # 声音已完全交由主程序的 TTS (Piper) 处理
-        # 本模块仅保留物理串口硬件报警器的触发逻辑
+        #声音已完全交由主程序的TTS(PyTTSx3)处理
+        #本模块仅保留物理串口硬件报警器的触发逻辑
         serial_ok = self.send_alarm(active)
         print(f"[HW] 物理报警触发: 串口={serial_ok}, 状态={active}")
 

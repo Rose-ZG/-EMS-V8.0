@@ -26,15 +26,15 @@ class EmailNotifier:
         if not receiver_email:
             return False
 
-        # 1. 准备邮件对象
+        #准备邮件对象
         msg = MIMEMultipart()
         current_time = time.strftime('%Y-%m-%d %H:%M:%S')
         msg['Subject'] = Header(f"【紧急警报】监测到老人跌倒 - {current_time}", 'utf-8')
-        # 必须严格符合之前测试成功的 From 格式防止 550 错误
+        #必须严格符合之前测试成功的 From 格式防止 550 错误
         msg['From'] = f"ElderMonitorSystem <{self.config['user']}>"
         msg['To'] = receiver_email
 
-        # 2. 邮件正文
+        #邮件正文
         body = f"""
                 <html>
                 <body>
@@ -49,9 +49,9 @@ class EmailNotifier:
                 """
         msg.attach(MIMEText(body, 'html', 'utf-8'))
 
-        # 3. 处理图片截帧
+        #处理图片截帧
         try:
-            # 将 OpenCV 的 BGR 图像转换为 JPG 格式
+            # 将OpenCV的BGR图像转换为JPG格式
             _, buffer = cv2.imencode('.jpg', frame)
             image_data = buffer.tobytes()
             img_mime = MIMEImage(image_data)
@@ -61,7 +61,7 @@ class EmailNotifier:
         except Exception as e:
             _elog(lambda log: log.error(f"邮件图片处理失败: {e}"))
 
-        # 4. 执行发送
+        #执行发送
         try:
             server = smtplib.SMTP_SSL(self.config['server'], self.config['port'], timeout=15)
             server.login(self.config['user'], self.config['password'])
