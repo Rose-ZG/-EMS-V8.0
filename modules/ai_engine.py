@@ -58,6 +58,9 @@ class VideoWorker(QThread):
         self.camera_id = 0
         self.cap = None
         self._camera_request = None
+        self.is_video_file = False          # True: 本地视频文件 | False: 物理摄像头
+        self.video_path = None              # 当前视频文件路径
+        self.source_fps = None              # 视频文件原生帧率，用于帧率控制
 
     @staticmethod
     def _log(fn):
@@ -79,11 +82,39 @@ class VideoWorker(QThread):
     def request_camera_switch(self, camera_index):
         self._camera_request = camera_index
 
-    def _perform_camera_switch(self, new_index):
+    def request_video_file(self, file_path):
+        """请求切换到本地视频文件（线程安全）"""
+        self._camera_request = file_path  # str 类型触发文件模式
+
+    def _open_video_file(self, file_path):
+        """打开本地视频文件，读取原生帧率用于播放速度控制"""
+        cap = cv2.VideoCapture(file_path)
+        if cap.isOpened():
+            # 读取视频文件的原始帧率，用于控制播放速度
+            native_fps = cap.get(cv2.CAP_PROP_FPS)
+            if native_fps <= 0 or native_fps > 120:
+                native_fps = 30.0  # 兜底：元数据异常时默认 30 FPS
+            self.source_fps = native_fps
+            self.is_video_file = True
+            self.video_path = file_path
+            self._log(lambda log: log.info(
+                f"📁 已加载测试视频: {os.path.basename(file_path)} ({native_fps:.1f} FPS)"))
+        return cap
+
+    def _perform_camera_switch(self, request):
+        """统一处理摄像头与视频文件的切换"""
         if self.cap and self.cap.isOpened():
             self.cap.release()
-        self.camera_id = new_index
-        self.cap = self._open_camera(new_index)
+        self.is_video_file = False
+        self.source_fps = None
+        self.video_path = None
+        if isinstance(request, str):
+            # ── 切换到本地视频文件 ──
+            self.cap = self._open_video_file(request)
+        else:
+            # ── 切换到物理摄像头 ──
+            self.camera_id = request
+            self.cap = self._open_camera(request)
         self._camera_request = None
 
     def get_fall_ratio(self):
@@ -350,10 +381,20 @@ class VideoWorker(QThread):
                 self.msleep(30)
                 continue
 
+            # ★ 本地视频帧率控制：记录每帧开始时间，用于后续限速
+            if self.is_video_file:
+                frame_start = time.time()
+
             ret, frame = self.cap.read()
             if not ret:
-                self.msleep(5)
-                continue
+                if self.is_video_file:
+                    # ★ 视频播完自动循环：重置到第 0 帧，无限循环测试
+                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    self.msleep(5)  # 防止文件损坏时 CPU 空转
+                    continue
+                else:
+                    self.msleep(5)
+                    continue
 
             try:
                 # 推理
@@ -407,6 +448,14 @@ class VideoWorker(QThread):
                     _error_flag = True
                 curr_time = time.time()
             prev_time = curr_time
+
+            # ★ 本地视频帧率控制：模拟真实摄像头播放速度，防止光速播放
+            if self.is_video_file and self.source_fps:
+                elapsed = time.time() - frame_start
+                sleep_time = (1.0 / self.source_fps) - elapsed
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+
             self.msleep(1)
 
         if self.cap:

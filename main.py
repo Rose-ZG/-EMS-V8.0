@@ -71,6 +71,7 @@ class Controller(QMainWindow):
 
         # 绑定控件
         self.ui.ref_btn.clicked.connect(self.refresh_cameras)
+        self.ui.import_video_btn.clicked.connect(self.import_test_video)
         self.ui.cam_selector.currentIndexChanged.connect(self.change_camera)
         self.ui.t_slider.valueChanged.connect(self.sync_params)
         self.ui.c_slider.valueChanged.connect(self.sync_params)
@@ -178,6 +179,18 @@ class Controller(QMainWindow):
     def change_camera(self, index):
         if 0 <= index < len(self.available_cams):
             self.worker.request_camera_switch(self.available_cams[index])
+
+    def import_test_video(self):
+        """弹出文件对话框选择本地 MP4 视频，动态切换为离线推流测试模式"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择本地跌倒测试视频",
+            "",
+            "视频文件 (*.mp4 *.avi *.mov *.mkv *.flv *.wmv)"
+        )
+        if file_path:
+            self.worker.request_video_file(file_path)
+            self.log.info(f"📁 已切换至测试视频: {os.path.basename(file_path)}")
 
     def save_snapshot(self, prefix):
         path = os.path.join(os.getcwd(), "records")

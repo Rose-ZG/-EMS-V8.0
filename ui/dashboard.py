@@ -41,6 +41,12 @@ class MainDashboard(QWidget):
         top_bar.addWidget(self.cam_selector, 1)
         self.ref_btn = QPushButton("🔄 刷新设备")
         top_bar.addWidget(self.ref_btn)
+        self.import_video_btn = QPushButton("📁 导入测试视频")
+        self.import_video_btn.setObjectName("import_video_btn")
+        self.import_video_btn.setStyleSheet(
+            "QPushButton#import_video_btn { background-color: #7c3aed; border: none; color: #f0f0ff; }"
+            "QPushButton#import_video_btn:hover { background-color: #9b5de5; }")
+        top_bar.addWidget(self.import_video_btn)
         left_container.addLayout(top_bar)
 
         self.video_label = QLabel("等待摄像头连接...")
