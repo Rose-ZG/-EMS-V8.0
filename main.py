@@ -1,8 +1,4 @@
 import sys, os
-
-# PyInstaller --windowed 模式下 sys.stdout/stderr 为 None，但 ultralytics 等库
-# 在 import 时就用 logging.StreamHandler 捕获了 stderr。这里必须最早设置，
-# 否则后续所有 logging.StreamHandler.emit() 会因 None.write() 而崩溃。
 if sys.stdout is None:
     sys.stdout = open(os.devnull, 'w')
 if sys.stderr is None:
@@ -17,11 +13,9 @@ import time, cv2, subprocess, io, platform
 import logging
 import numpy as np
 
-# numpy >= 1.24 严格禁止 float 作整数索引，部分旧版 C 扩展库可能触发；
-# 将其降级为 DeprecationWarning 避免 TypeError 刷屏 stderr
 np.set_printoptions(suppress=True)
 
-# 静默 ultralytics 等第三方库的 per-frame 调试日志
+# 静默第三方库日志
 for _name in ('ultralytics', 'faster_whisper', 'PIL', 'matplotlib'):
     logging.getLogger(_name).setLevel(logging.ERROR)
 
@@ -35,18 +29,19 @@ from modules.logger import Logger
 from ui.dashboard import MainDashboard
 from modules._resource import resource_path
 from dotenv import load_dotenv
+
 load_dotenv(resource_path('.env'))
 
 from ui.setup_dialog import SetupDialog
-
 from modules.email_notifier import EmailNotifier
+
 
 class Controller(QMainWindow):
     def __init__(self):
         self.os_type = platform.system()
         super().__init__()
         self.setWindowTitle("居家康复监测系统[EMS] v8.0")
-        self.setWindowIcon(QIcon(resource_path("assets/EMS_logo.ico")))
+        self.setWindowIcon(QIcon(resource_path("assets/EMS_logo_new.ico")))
         self.resize(1200, 850)
 
         self.available_cams = []
@@ -79,7 +74,8 @@ class Controller(QMainWindow):
         self.ui.snap_btn.clicked.connect(lambda: self.save_snapshot("MANUAL"))
         self.ui.open_btn.clicked.connect(self.open_folder)
         self.ui.call_btn.clicked.connect(self.call_for_help)
-        self.ui.save_phone_btn.clicked.connect(self.save_phone_number)
+        self.ui.save_phone_btn.clicked.connect(self.save_phone_number)  # 绑定保存按钮
+        self.ui.test_email_btn.clicked.connect(self.send_test_email)  # 测试邮件按钮
 
         self.sync_params()
         self.worker.start()
@@ -93,9 +89,23 @@ class Controller(QMainWindow):
         }
         self.email_notifier = EmailNotifier(self.smtp_config)
 
-        self.contacts = [
-            {"name": "家属A", "email": "2047103550@qq.com", "phone": "", "enabled": True}
-        ]
+        # 从环境变量读取紧急联系人邮箱（支持逗号分隔多个邮箱）
+        default_email_str = os.environ.get("DEFAULT_ALERT_EMAIL", "")
+        if default_email_str:
+            email_list = [e.strip() for e in default_email_str.split(",") if e.strip()]
+        else:
+            # 如果未配置紧急联系人，默认使用发件邮箱（向后兼容）
+            email_list = [self.smtp_config.get("user", "")]
+        email_list = [e for e in email_list if e]  # 过滤空字符串
+
+        self.contacts = []
+        for i, email in enumerate(email_list):
+            name = f"紧急联系人{i + 1}" if len(email_list) > 1 else "紧急联系人"
+            self.contacts.append({"name": name, "email": email, "phone": "", "enabled": True})
+
+        # 回显到 UI 输入框中（显示第一个联系人邮箱）
+        if hasattr(self.ui, 'phone_edit') and self.contacts:
+            self.ui.phone_edit.setText(self.contacts[0]["email"])
 
     def sync_params(self):
         slider_val = self.ui.t_slider.value()
@@ -107,7 +117,6 @@ class Controller(QMainWindow):
         self.ui.video_label.setPixmap(QPixmap.fromImage(img))
         self.ui.fps_label.setText(f"FPS: {fps:.1f}")
 
-        # 管理报警状态（与语音交互联动）
         if not self.worker.is_interacting and not self.worker.is_alarming:
             fall_ratio = self.worker.get_fall_ratio()
 
@@ -116,11 +125,8 @@ class Controller(QMainWindow):
         self.ui.status_label.setText("🚨 紧急求救！已发送通知")
         self.log.alert("CRITICAL: 语音确认异常！触发终极报警闭环")
 
-        for contact in self.contacts:
-            if contact.get("enabled") and contact.get("email"):
-                self.email_notifier.send_fall_alert(
-                    contact["email"], frame, location="居家环境监控点A")
-                self.log.alert(f"告警邮件已发送至 {contact['name']}({contact['email']})")
+        # 【修改 2】：统一调用带异常捕获的发送函数
+        self.send_alert_email(frame)
 
     def trigger_local_alarm(self):
         """阶段一：视觉发现跌倒，瞬间让 UI 变红并开启物理警报灯"""
@@ -129,8 +135,8 @@ class Controller(QMainWindow):
             "font-size:20pt; color:white; background:#d9534f; font-weight:bold; border-radius:14px; padding:14px;")
         self.hw.alert_with_voice(active=True)
         self.log.alert("WARN: 视觉检测到跌倒，正在进行语音核实...")
+
     def call_for_help(self):
-        # 【追加防护】：如果 AI 正在交互中，忽略手动点击
         if self.worker.is_interacting:
             self.log.warn("系统正在语音交互中，请稍后再试")
             return
@@ -151,13 +157,77 @@ class Controller(QMainWindow):
 
     def send_alert_email(self, fall_frame):
         """闭环告警：向所有启用的联系人发送邮件"""
+        has_enabled_contact = False
         for contact in self.contacts:
             if contact.get("enabled") and contact.get("email"):
-                success = self.email_notifier.send_fall_alert(contact["email"], fall_frame, location="老人卧室")
+                has_enabled_contact = True
+                # 执行发送
+                success = self.email_notifier.send_fall_alert(
+                    contact["email"], fall_frame, location="居家环境监控点A"
+                )
                 if success:
-                    self.log.success(f"告警邮件已发送至 {contact['name']}({contact['email']})")
+                    self.log.success(f"📩 告警邮件已成功发送至: {contact['name']}({contact['email']})")
                 else:
-                    self.log.error(f"发送至 {contact['name']}({contact['email']}) 失败")
+                    self.log.error(f"❌ 发送至 {contact['name']}({contact['email']}) 失败，请检查邮件配置")
+
+        if not has_enabled_contact:
+            self.log.warn("⚠️ 未检测到有效的紧急联系人邮箱，跳过邮件发送。")
+
+    def save_phone_number(self):
+        """获取输入框的邮箱，并真正更新到 self.contacts 中"""
+        email = self.ui.phone_edit.text().strip()
+        if email and "@" in email and "." in email.split("@")[-1]:
+            # 支持逗号分隔多个邮箱
+            email_list = [e.strip() for e in email.split(",") if e.strip()]
+            self.contacts = []
+            for i, em in enumerate(email_list):
+                name = f"紧急联系人{i + 1}" if len(email_list) > 1 else "紧急联系人"
+                self.contacts.append({"name": name, "email": em, "phone": "", "enabled": True})
+            self.log.success(f"✅ 紧急联系人邮箱已成功设置为: {email}")
+        else:
+            self.log.error("❌ 请输入有效的邮箱地址（如: example@qq.com，多个邮箱用逗号分隔）")
+
+    def send_test_email(self):
+        """发送测试邮件验证邮箱配置是否正确"""
+        # 先确保联系人信息是最新的
+        current_email = self.ui.phone_edit.text().strip()
+        if current_email and "@" in current_email:
+            email_list = [e.strip() for e in current_email.split(",") if e.strip()]
+            self.contacts = []
+            for i, em in enumerate(email_list):
+                name = f"紧急联系人{i + 1}" if len(email_list) > 1 else "紧急联系人"
+                self.contacts.append({"name": name, "email": em, "phone": "", "enabled": True})
+
+        if not self.contacts:
+            self.log.error("❌ 请先在紧急联系人输入框中输入邮箱地址")
+            return
+
+        self.log.info("📧 正在发送测试邮件...")
+        has_enabled_contact = False
+        all_success = True
+        for contact in self.contacts:
+            if contact.get("enabled") and contact.get("email"):
+                has_enabled_contact = True
+                # 创建一个空白测试帧
+                test_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                cv2.putText(test_frame, "EMS Test Email", (120, 240),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
+                cv2.putText(test_frame, time.strftime('%Y-%m-%d %H:%M:%S'), (140, 300),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 200), 2)
+
+                success = self.email_notifier.send_fall_alert(
+                    contact["email"], test_frame, location="居家环境监控点A [测试]"
+                )
+                if success:
+                    self.log.success(f"✅ 测试邮件已成功发送至: {contact['name']}({contact['email']})")
+                else:
+                    self.log.error(f"❌ 发送至 {contact['name']}({contact['email']}) 失败，请检查SMTP配置")
+                    all_success = False
+
+        if not has_enabled_contact:
+            self.log.error("❌ 未检测到有效的紧急联系人邮箱")
+        elif all_success:
+            self.log.success("🎉 所有测试邮件发送成功！邮件告警系统工作正常")
 
     def refresh_cameras(self):
         self.ui.cam_selector.blockSignals(True)
@@ -181,12 +251,8 @@ class Controller(QMainWindow):
             self.worker.request_camera_switch(self.available_cams[index])
 
     def import_test_video(self):
-        """弹出文件对话框选择本地 MP4 视频，动态切换为离线推流测试模式"""
         file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "选择本地跌倒测试视频",
-            "",
-            "视频文件 (*.mp4 *.avi *.mov *.mkv *.flv *.wmv)"
+            self, "选择本地跌倒测试视频", "", "视频文件 (*.mp4 *.avi *.mov *.mkv *.flv *.wmv)"
         )
         if file_path:
             self.worker.request_video_file(file_path)
@@ -210,27 +276,19 @@ class Controller(QMainWindow):
         else:
             subprocess.run(['xdg-open', path])
 
-    def save_phone_number(self):
-        email = self.ui.phone_edit.text().strip()
-        if email and "@" in email and "." in email.split("@")[-1]:
-            self.log.success(f"紧急联系人邮箱已设置: {email}")
-        else:
-            self.log.error("请输入有效的邮箱地址")
-
     def closeEvent(self, event):
         self.worker.stop()
         self.hw.close()
         event.accept()
 
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
 
-    # 首次启动 / 缺少配置时弹出设置向导
     if SetupDialog.needs_setup():
         dlg = SetupDialog()
         if dlg.exec() == QDialog.Rejected:
-            # 用户选择跳过——仍可启动，但告警邮件功能不可用
             pass
 
     window = Controller()

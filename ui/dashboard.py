@@ -145,6 +145,17 @@ class MainDashboard(QWidget):
         self.save_phone_btn = QPushButton("保存")
         phone_layout.addWidget(self.save_phone_btn)
         contact_layout.addLayout(phone_layout)
+
+        # 添加测试邮件按钮
+        test_btn_layout = QHBoxLayout()
+        self.test_email_btn = QPushButton("📧 发送测试邮件")
+        self.test_email_btn.setObjectName("test_email_btn")
+        self.test_email_btn.setStyleSheet(
+            "QPushButton#test_email_btn { background-color: #7aa2f7; border: none; color: #1a1a2e; font-weight: bold; }"
+            "QPushButton#test_email_btn:hover { background-color: #96b9fc; }")
+        test_btn_layout.addWidget(self.test_email_btn)
+        contact_layout.addLayout(test_btn_layout)
+
         right_container.addWidget(contact_group)
 
         self.reset_btn = QPushButton("🚨 警报解除 / 硬件初始化")
