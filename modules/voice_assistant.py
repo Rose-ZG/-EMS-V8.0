@@ -1,118 +1,112 @@
 import os
-import torch
-import sounddevice as sd
-from scipy.io.wavfile import write
-from faster_whisper import WhisperModel
-from .logger import Logger
-from ._resource import resource_path
+
+from modules._resource import resource_path
+from modules.logger import Logger
+
+try:
+    import torch
+except ImportError:
+    torch = None
+
+try:
+    import sounddevice as sd
+except ImportError:
+    sd = None
+
+try:
+    from scipy.io.wavfile import write
+except ImportError:
+    write = None
+
+try:
+    from faster_whisper import WhisperModel
+except ImportError:
+    WhisperModel = None
 
 
 def _vlog(fn):
-    """Logger 未初始化时静默，已初始化则调用"""
-    log = Logger.instance()
-    if log:
-        fn(log)
+    logger = Logger.instance()
+    if logger:
+        fn(logger)
 
 
 class VoiceAssistant:
     def __init__(self, model_path=None):
-        if model_path is None:
-            model_path = resource_path("models/whisper-small")
-        _vlog(lambda log: log.info("正在初始化本地语音引擎..."))
+        model_path = model_path or resource_path("models/whisper-small")
+        self.model = None
+        self.has_cuda = bool(torch and torch.cuda.is_available())
 
-        # Whisper - 初始化语音识别模型
-        self.has_cuda = torch.cuda.is_available()
+        if WhisperModel is None:
+            _vlog(lambda log: log.warn("faster-whisper is not installed. Speech recognition is disabled."))
+            return
+
         device = "cuda" if self.has_cuda else "cpu"
         compute_type = "float16" if self.has_cuda else "int8"
+
         try:
             self.model = WhisperModel(model_path, device=device, compute_type=compute_type)
-            _vlog(lambda log: log.info(f"Whisper 语音识别加载成功 (Device: {device})"))
-        except Exception as e:
-            _vlog(lambda log: log.error(f"Whisper 加载失败: {e}"))
-            self.model = None
+            _vlog(lambda log: log.info(f"Whisper model loaded on {device}."))
+        except Exception as exc:
+            _vlog(lambda log: log.warn(f"Whisper model unavailable: {exc}"))
 
     def speak(self, text):
-        """文字转语音 - 完美解决 Windows 多线程 COM 组件崩溃问题"""
-        _vlog(lambda log: log.voice(f"🔊 语音合成: {text}"))
+        _vlog(lambda log: log.voice(f"TTS: {text}"))
         try:
             import pyttsx3
-            import pythoncom  # 导入Windows底层COM库
+            try:
+                import pythoncom
+            except ImportError:
+                pythoncom = None
 
-            #调用系统语音组件！
-            pythoncom.CoInitialize()
+            if pythoncom is not None:
+                pythoncom.CoInitialize()
 
             engine = pyttsx3.init()
-            # 设置语速
-            engine.setProperty('rate', 160)
+            engine.setProperty("rate", 160)
             engine.say(text)
             engine.runAndWait()
-
-        except Exception as e:
-            _vlog(lambda log: log.error(f"语音播报失败: {e}"))
+        except Exception as exc:
+            _vlog(lambda log: log.warn(f"TTS unavailable: {exc}"))
 
     def record_and_transcribe(self, duration=5, filename="temp/temp_ask.wav"):
-        """录音并转写"""
-        if not self.model:
-            _vlog(lambda log: log.error("Whisper 模型未加载，无法进行语音识别"))
+        if self.model is None:
+            _vlog(lambda log: log.warn("Speech recognition model is unavailable."))
             return ""
-        fs = 16000
-        frames = int(duration * fs)
-        _vlog(lambda log: log.voice(f"🎙️ 开始录音 ({duration} 秒)..."))
+        if sd is None or write is None:
+            _vlog(lambda log: log.warn("sounddevice/scipy is missing. Audio capture is disabled."))
+            return ""
+
+        sample_rate = 16000
+        frames = int(duration * sample_rate)
+        target_path = resource_path(filename)
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+
         try:
-            recording = sd.rec(frames, samplerate=fs, channels=1, dtype='int16')
+            _vlog(lambda log: log.voice(f"Recording {duration} seconds of audio..."))
+            recording = sd.rec(frames, samplerate=sample_rate, channels=1, dtype="int16")
             sd.wait()
             sd.stop()
-            os.makedirs(os.path.dirname(filename), exist_ok=True)
-            write(filename, fs, recording)
+            write(target_path, sample_rate, recording)
 
-            _vlog(lambda log: log.voice("🔄 语音识别中..."))
-            segments, _ = self.model.transcribe(
-                filename, language="zh", beam_size=5,
-                vad_filter=False  # 短录音无需 VAD，且避免 numpy >= 1.24 的 float32 索引兼容性问题
-            )
-            text = "".join([s.text for s in segments])
-            _vlog(lambda log: log.voice(f"📝 识别结果: {text}"))
-            return text.strip()
-        except Exception as e:
-            _vlog(lambda log: log.error(f"录音/识别失败: {e}"))
+            _vlog(lambda log: log.voice("Transcribing audio..."))
+            segments, _ = self.model.transcribe(target_path, language="zh", beam_size=5, vad_filter=False)
+            text = "".join(segment.text for segment in segments).strip()
+            _vlog(lambda log: log.voice(f"ASR: {text or '[empty]'}"))
+            return text
+        except Exception as exc:
+            _vlog(lambda log: log.error(f"Audio capture/transcription failed: {exc}"))
             return ""
 
     def ask_and_listen(self, prompt, duration=5):
-        """合成语音提问 -> 录音 -> 识别"""
         self.speak(prompt)
         return self.record_and_transcribe(duration=duration)
 
     def test_microphone(self, duration=3):
-        """
-        试音功能：循环测试麦克风与识别准确率。
-        说出“停止”、“退出”或“结束”即可退出测试。
-        """
-        print("\n" + "=" * 40)
-        print("🎙️ 麦克风试音模式已开启 🎙️")
-        print("请对准麦克风说话。每次录音 {} 秒。".format(duration))
-        print("想要退出测试，请说出：'停止'、'退出' 或 '结束'。")
-        print("=" * 40 + "\n")
-
-        # 播报提示音
-        self.speak("试音模式已开启，请对准麦克风说话。")
-
+        print("Microphone test mode started. Say 'stop' to quit.")
+        self.speak("Microphone test mode started.")
         while True:
-            # 调用已有的录音并转写函数
             result = self.record_and_transcribe(duration=duration)
-
-            # 检查是否有结果
-            if result:
-                print(f"👉 【试音结果】: {result}")
-
-                # 检查退出关键词
-                if any(word in result for word in ["停止", "退出", "结束"]):
-                    print("\n[试音结束] 退出试音模式。")
-                    self.speak("试音结束，已退出。")
-                    break
-            else:
-                print("👉 【试音结果】: (未听到声音或识别为空)")
-
-if __name__ == "__main__":
-        assistant = VoiceAssistant()
-        # 启动试音，每次录音3秒
-        assistant.test_microphone(duration=3)
+            print(f"Result: {result or '[empty]'}")
+            if any(word in result.lower() for word in ("stop", "quit", "结束", "停止")):
+                self.speak("Microphone test finished.")
+                break

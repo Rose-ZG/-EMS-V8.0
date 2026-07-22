@@ -1,50 +1,33 @@
-import cv2
-import time
 import os
 import platform
-import numpy as np
 import threading
+import time
 from collections import deque
-from PySide6.QtCore import QThread, Signal, QObject
-from PySide6.QtGui import QImage
-from ultralytics import YOLO
 
-from modules.logger import Logger
+import cv2
+import numpy as np
+from PySide6.QtCore import QThread, Signal
+from PySide6.QtGui import QImage
+
 from modules._resource import resource_path
+from modules.logger import Logger
 from modules.voice_assistant import VoiceAssistant
 
+try:
+    from ultralytics import YOLO
+except ImportError:
+    YOLO = None
+
+
 class VideoWorker(QThread):
-    #信号：图像、是否跌倒、FPS
-    change_pixmap_signal=Signal(QImage, bool, float)
-    #numpy.ndarray类型用于传递图像数据
-    emergency_call_signal=Signal(np.ndarray)
-    #即时预警与复位信号
-    pre_alarm_signal=Signal()
-    cancel_alarm_signal=Signal()
+    change_pixmap_signal = Signal(QImage, bool, float)
+    emergency_call_signal = Signal(np.ndarray)
+    pre_alarm_signal = Signal()
+    cancel_alarm_signal = Signal()
 
     def __init__(self, model_path=None, debug=False):
         super().__init__()
         self.debug = debug
-
-        if model_path is None:
-            model_path = resource_path('yolov8n-pose.pt')
-
-        #加载视觉模型（回退机制）
-        if not os.path.exists(model_path):
-            fallback = resource_path('yolov8n-pose.pt')
-            self._log(lambda log: log.warn(f"模型 {model_path} 未找到，回退到 {fallback}"))
-            model_path = fallback
-        try:
-            self.model = YOLO(model_path)
-            self._log(lambda log: log.info(f"视觉模型已加载: {model_path}"))
-        except Exception as e:
-            self._log(lambda log: log.error(f"模型加载失败: {e}"))
-            self.model = None
-
-        #初始化语音助手
-        self.assistant = VoiceAssistant()
-
-        #运行参数
         self.running = True
         self.is_interacting = False
         self.is_alarming = False
@@ -52,22 +35,40 @@ class VideoWorker(QThread):
         self.angle_threshold = 35
         self.conf_val = 0.5
         self.inference_size = 192
-
         self.fall_history = deque(maxlen=15)
-        self.prev_states = {}               # track_id -> (cx, cy) 帧间速度计算
+        self.prev_states = {}
         self.camera_id = 0
         self.cap = None
         self._camera_request = None
-        self.is_video_file = False          # True: 本地视频文件 | False: 物理摄像头
-        self.video_path = None              # 当前视频文件路径
-        self.source_fps = None              # 视频文件原生帧率，用于帧率控制
+        self.is_video_file = False
+        self.video_path = None
+        self.source_fps = None
+        self._missing_model_logged = False
+
+        self.assistant = VoiceAssistant()
+        self.model = self._load_model(model_path)
 
     @staticmethod
     def _log(fn):
-        """Logger 未初始化时静默，已初始化则调用"""
-        log = Logger.instance()
-        if log:
-            fn(log)
+        logger = Logger.instance()
+        if logger:
+            fn(logger)
+
+    def _load_model(self, model_path=None):
+        if YOLO is None:
+            self._log(lambda log: log.warn("ultralytics is not installed. AI detection is disabled."))
+            return None
+
+        candidate = model_path or resource_path("yolov8n-pose.pt")
+        load_target = candidate if os.path.exists(candidate) else "yolov8n-pose.pt"
+
+        try:
+            model = YOLO(load_target)
+            self._log(lambda log: log.info(f"YOLO model loaded from {load_target}."))
+            return model
+        except Exception as exc:
+            self._log(lambda log: log.warn(f"YOLO model unavailable: {exc}"))
+            return None
 
     def _open_camera(self, camera_id):
         backend = cv2.CAP_DSHOW if platform.system() == "Windows" else cv2.CAP_V4L2
@@ -79,47 +80,38 @@ class VideoWorker(QThread):
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         return cap
 
+    def _open_video_file(self, file_path):
+        cap = cv2.VideoCapture(file_path)
+        if cap.isOpened():
+            native_fps = cap.get(cv2.CAP_PROP_FPS)
+            self.source_fps = native_fps if 0 < native_fps <= 120 else 30.0
+            self.is_video_file = True
+            self.video_path = file_path
+            self._log(lambda log: log.info(f"Loaded local test video: {os.path.basename(file_path)}"))
+        return cap
+
     def request_camera_switch(self, camera_index):
         self._camera_request = camera_index
 
     def request_video_file(self, file_path):
-        """请求切换到本地视频文件（线程安全）"""
-        self._camera_request = file_path  # str 类型触发文件模式
-
-    def _open_video_file(self, file_path):
-        """打开本地视频文件，读取原生帧率用于播放速度控制"""
-        cap = cv2.VideoCapture(file_path)
-        if cap.isOpened():
-            # 读取视频文件的原始帧率，用于控制播放速度
-            native_fps = cap.get(cv2.CAP_PROP_FPS)
-            if native_fps <= 0 or native_fps > 120:
-                native_fps = 30.0  # 兜底：元数据异常时默认 30 FPS
-            self.source_fps = native_fps
-            self.is_video_file = True
-            self.video_path = file_path
-            self._log(lambda log: log.info(
-                f"📁 已加载测试视频: {os.path.basename(file_path)} ({native_fps:.1f} FPS)"))
-        return cap
+        self._camera_request = file_path
 
     def _perform_camera_switch(self, request):
-        """统一处理摄像头与视频文件的切换"""
         if self.cap and self.cap.isOpened():
             self.cap.release()
         self.is_video_file = False
         self.source_fps = None
         self.video_path = None
+
         if isinstance(request, str):
-            # ── 切换到本地视频文件 ──
             self.cap = self._open_video_file(request)
         else:
-            # ── 切换到物理摄像头 ──
             self.camera_id = request
             self.cap = self._open_camera(request)
         self._camera_request = None
 
     def get_fall_ratio(self):
-        """返回滑动窗口中跌倒帧的比例"""
-        if len(self.fall_history) == 0:
+        if not self.fall_history:
             return 0.0
         return sum(self.fall_history) / len(self.fall_history)
 
@@ -136,85 +128,87 @@ class VideoWorker(QThread):
         if not results or len(results) == 0:
             return 0.0
 
-        #阈值配置
-        kp_conf_thresh = getattr(self, 'kp_conf_threshold', 0.5)
-        kp_ratio_thresh = getattr(self, 'kp_ratio_threshold', 1.0)
-        angle_thresh = getattr(self, 'angle_threshold', 45)
+        kp_conf_thresh = getattr(self, "kp_conf_threshold", 0.5)
+        kp_ratio_thresh = getattr(self, "kp_ratio_threshold", 1.0)
+        angle_thresh = getattr(self, "angle_threshold", 45)
 
-        #COCO关键点索引
-        LSHO,RSHO=5,6
-        LHIP,RHIP=11,12
-        LKNE,RKNE=13,14
-        LANK,RANK=15,16
+        lsho, rsho = 5, 6
+        lhip, rhip = 11, 12
+        lkne, rkne = 13, 14
+        lank, rank = 15, 16
 
-        for r in results:
-            if r.boxes is None or r.keypoints is None:
+        for result in results:
+            if result.boxes is None or result.keypoints is None:
                 continue
-            frame_h=r.orig_shape[0]
+            frame_h = result.orig_shape[0]
 
-            for i, box in enumerate(r.boxes):
+            for index, box in enumerate(result.boxes):
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                w, h = x2 - x1, y2 - y1
-                if h < 10 or w < 10:
+                width, height = x2 - x1, y2 - y1
+                if height < 10 or width < 10:
                     continue
-                box_ratio = w / h
+                box_ratio = width / height
 
                 track_id = int(box.id[0]) if box.id is not None else None
-                kps = r.keypoints.data[i].cpu().numpy()
+                kps = result.keypoints.data[index].cpu().numpy()
                 cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
 
-                # ── 关键点不足 → 回退到检测框宽高比 ──
                 if len(kps) < 17:
                     if box_ratio > 1.8:
                         score = max(score, 0.50)
                     continue
 
-                # ── 仅头部可见时跳过（无法判断姿态）──
                 body_kp_visible = int((kps[5:17, 2] > kp_conf_thresh).sum())
                 if body_kp_visible < 3:
                     continue
 
-                # ── 提取关键点置信度 ──
-                lsho_c = kps[LSHO][2] > kp_conf_thresh
-                rsho_c = kps[RSHO][2] > kp_conf_thresh
+                lsho_c = kps[lsho][2] > kp_conf_thresh
+                rsho_c = kps[rsho][2] > kp_conf_thresh
                 sho_ok = lsho_c and rsho_c
                 shoulder_mid = (
-                    np.array([(kps[LSHO][0] + kps[RSHO][0]) / 2,
-                              (kps[LSHO][1] + kps[RSHO][1]) / 2])
-                    if sho_ok else None
+                    np.array(
+                        [
+                            (kps[lsho][0] + kps[rsho][0]) / 2,
+                            (kps[lsho][1] + kps[rsho][1]) / 2,
+                        ]
+                    )
+                    if sho_ok
+                    else None
                 )
 
-                lhip_c = kps[LHIP][2] > kp_conf_thresh
-                rhip_c = kps[RHIP][2] > kp_conf_thresh
+                lhip_c = kps[lhip][2] > kp_conf_thresh
+                rhip_c = kps[rhip][2] > kp_conf_thresh
                 hip_ok = lhip_c and rhip_c
                 hip_mid = (
-                    np.array([(kps[LHIP][0] + kps[RHIP][0]) / 2,
-                              (kps[LHIP][1] + kps[RHIP][1]) / 2])
-                    if hip_ok else None
+                    np.array(
+                        [
+                            (kps[lhip][0] + kps[rhip][0]) / 2,
+                            (kps[lhip][1] + kps[rhip][1]) / 2,
+                        ]
+                    )
+                    if hip_ok
+                    else None
                 )
 
-                lkne_c = kps[LKNE][2] > kp_conf_thresh
-                rkne_c = kps[RKNE][2] > kp_conf_thresh
-                lank_c = kps[LANK][2] > kp_conf_thresh
-                rank_c = kps[RANK][2] > kp_conf_thresh
+                lkne_c = kps[lkne][2] > kp_conf_thresh
+                rkne_c = kps[rkne][2] > kp_conf_thresh
+                lank_c = kps[lank][2] > kp_conf_thresh
+                rank_c = kps[rank][2] > kp_conf_thresh
 
-                # ── 阶段1: 初步判断 ──
-                # 规则3: 肩在脚下方 (shoulder_y > ankle_y)
                 rule3 = False
-                if lsho_c and lank_c and kps[LSHO][1] > kps[LANK][1]:
+                if lsho_c and lank_c and kps[lsho][1] > kps[lank][1]:
                     rule3 = True
-                elif rsho_c and rank_c and kps[RSHO][1] > kps[RANK][1]:
+                elif rsho_c and rank_c and kps[rsho][1] > kps[rank][1]:
                     rule3 = True
                 if not rule3 and sho_ok and lank_c and rank_c:
-                    ankle_mid_y = (kps[LANK][1] + kps[RANK][1]) / 2
+                    ankle_mid_y = (kps[lank][1] + kps[rank][1]) / 2
                     if shoulder_mid[1] > ankle_mid_y:
                         rule3 = True
 
-                # 规则4: 膝盖在肩上方 (knee_y < shoulder_y)
                 rule4 = False
-                if lsho_c and lkne_c and kps[LKNE][1] < kps[LSHO][1]:
+                if lsho_c and lkne_c and kps[lkne][1] < kps[lsho][1]:
                     rule4 = True
-                elif rsho_c and rkne_c and kps[RKNE][1] < kps[RSHO][1]:
+                elif rsho_c and rkne_c and kps[rkne][1] < kps[rsho][1]:
                     rule4 = True
 
                 suspected = rule3 or rule4
@@ -224,7 +218,6 @@ class VideoWorker(QThread):
                         score = max(score, 0.45)
                     continue
 
-                # ── 阶段2: 关键点外接矩形宽高比验证 ──
                 valid_mask = kps[:, 2] > 0
                 valid_pts = kps[valid_mask]
                 if len(valid_pts) >= 2:
@@ -239,10 +232,8 @@ class VideoWorker(QThread):
                         score = max(score, 0.40)
                     continue
 
-                # ── 阶段3: 角度规则确认 ──
-                person_score = 0.50  # 通过阶段1+2的基础分
+                person_score = 0.50
 
-                #大腿与水平面夹角
                 def _thigh_horizontal(hip_i, knee_i):
                     if not (kps[hip_i][2] > kp_conf_thresh and kps[knee_i][2] > kp_conf_thresh):
                         return False
@@ -253,7 +244,6 @@ class VideoWorker(QThread):
                     cos_a = abs(vec[0]) / norm_v
                     return np.degrees(np.arccos(np.clip(cos_a, -1, 1))) < angle_thresh
 
-                #躯干-大腿夹角（髋部折叠）
                 def _torso_thigh(hip_i, knee_i):
                     if not (sho_ok and hip_ok and kps[knee_i][2] > kp_conf_thresh):
                         return False
@@ -265,11 +255,12 @@ class VideoWorker(QThread):
                     cos_a = np.dot(torso, thigh) / (nt * nf)
                     return np.degrees(np.arccos(np.clip(cos_a, -1, 1))) < angle_thresh
 
-                #大腿-小腿夹角（膝部折叠）
                 def _thigh_shin(hip_i, knee_i, ankle_i):
-                    if not (kps[hip_i][2] > kp_conf_thresh
-                            and kps[knee_i][2] > kp_conf_thresh
-                            and kps[ankle_i][2] > kp_conf_thresh):
+                    if not (
+                        kps[hip_i][2] > kp_conf_thresh
+                        and kps[knee_i][2] > kp_conf_thresh
+                        and kps[ankle_i][2] > kp_conf_thresh
+                    ):
                         return False
                     thigh = kps[knee_i][:2] - kps[hip_i][:2]
                     shin = kps[ankle_i][:2] - kps[knee_i][:2]
@@ -280,16 +271,15 @@ class VideoWorker(QThread):
                     return np.degrees(np.arccos(np.clip(cos_a, -1, 1))) < angle_thresh
 
                 angle_count = 0
-                if _thigh_horizontal(LHIP, LKNE) or _thigh_horizontal(RHIP, RKNE):
+                if _thigh_horizontal(lhip, lkne) or _thigh_horizontal(rhip, rkne):
                     angle_count += 1
-                if _torso_thigh(LHIP, LKNE) or _torso_thigh(RHIP, RKNE):
+                if _torso_thigh(lhip, lkne) or _torso_thigh(rhip, rkne):
                     angle_count += 1
-                if _thigh_shin(LHIP, LKNE, LANK) or _thigh_shin(RHIP, RKNE, RANK):
+                if _thigh_shin(lhip, lkne, lank) or _thigh_shin(rhip, rkne, rank):
                     angle_count += 1
 
                 person_score += angle_count * 0.15
 
-                # ── 阶段4: 帧间速度加成 ──
                 velocity_score = 0.0
                 if track_id is not None and track_id in self.prev_states:
                     px, py = self.prev_states[track_id]
@@ -308,72 +298,70 @@ class VideoWorker(QThread):
         return score
 
     def handle_emergency(self, current_frame):
-        """在独立线程中运行，通过信号与主界面交互"""
         try:
             self._handle_emergency_impl(current_frame)
-        except Exception as e:
-            self._log(lambda log: log.error(f"语音核实流程异常: {e}"))
+        except Exception as exc:
+            self._log(lambda log: log.error(f"Voice confirmation flow failed: {exc}"))
             self.cancel_alarm_signal.emit()
             self.fall_history.clear()
             self.is_interacting = False
 
     def _handle_emergency_impl(self, current_frame):
-        self._log(lambda log: log.voice("🎤 进入语音核实流程"))
-        self.assistant.speak("系统检测到您可能摔倒了，需要报警吗？")
-        reply = self.assistant.record_and_transcribe(duration=3).strip()
-        self._log(lambda log: log.voice(f"识别结果: 「{reply}」"))
+        self._log(lambda log: log.voice("Starting voice confirmation."))
+        self.assistant.speak("A possible fall was detected. Do you need help?")
+        reply = self.assistant.record_and_transcribe(duration=3).strip().lower()
+        self._log(lambda log: log.voice(f"Voice reply: {reply or '[empty]'}"))
 
-        danger_keywords = [
-            '要', '救命', '报警', '疼', '是的', '好', '帮我', '摔了','我摔倒了',
-            '起不来', '动不了', '救我', '医生', '快来', '救人', '求救', '紧急'
-        ]
+        danger_keywords = {"help", "emergency", "pain", "yes", "call", "doctor", "救命", "帮我", "摔倒"}
+        safe_keywords = {"no", "fine", "cancel", "ok", "不用", "没事", "误报"}
 
-        safe_keywords = [
-            '没事', '不用', '不需要', '误报', '没摔', '好着呢',
-            '走开', '取消', '测试', '我很好', '没有摔', '开玩笑', '自己能起'
-        ]
-
-        needs_help = False
-        # 1. 首先检查是否完全没有说话（静默判定为危险）
         if len(reply) < 2:
-            self._log(lambda log: log.voice("无有效语音回应 → 判定为昏迷/危险"))
             needs_help = True
-
-        # 2. 优先检查"安全关键词"（这样即便说了"不需要报警"，也会先被判定为安全）
         elif any(word in reply for word in safe_keywords):
-            self._log(lambda log: log.voice("用户确认安全 ✅"))
-            self.assistant.speak("好的，已为您取消警报。")
+            self.assistant.speak("Alert cancelled.")
             needs_help = False
-
-        # 3. 再检查"危险关键词"
         elif any(word in reply for word in danger_keywords):
-            self._log(lambda log: log.voice("用户确认需要帮助 🆘"))
             needs_help = True
-
-        # 4. 兜底逻辑：如果用户说了一堆话，但既没说没事，也没说救命
         else:
-            self._log(lambda log: log.voice("语义不明 → 默认报警"))
-            self.assistant.speak("抱歉，我没听清楚，为您启动紧急求助。")
+            self.assistant.speak("I could not confirm safety, sending an alert.")
             needs_help = True
 
         if needs_help:
-            self.assistant.speak("已收到，正在通知紧急联系人。")
+            self.assistant.speak("Emergency contacts are being notified.")
             self.emergency_call_signal.emit(current_frame)
         else:
             self.cancel_alarm_signal.emit()
 
         self.fall_history.clear()
         self.is_interacting = False
-        self._log(lambda log: log.info("语音核实流程结束"))
+        self._log(lambda log: log.info("Voice confirmation complete."))
+
+    def _predict(self, frame):
+        if self.model is None:
+            if not self._missing_model_logged:
+                self._log(lambda log: log.warn("Running in preview-only mode because the AI model is unavailable."))
+                self._missing_model_logged = True
+            return []
+        try:
+            return self.model.track(
+                frame,
+                persist=True,
+                tracker="bytetrack.yaml",
+                conf=self.conf_val,
+                iou=0.5,
+                classes=[0],
+                verbose=False,
+            )
+        except Exception as exc:
+            self._log(lambda log: log.error(f"Model inference failed: {exc}"))
+            return []
 
     def run(self):
         if not self.cap:
             self.cap = self._open_camera(self.camera_id)
-        prev_time = time.time()
-        _error_flag = False  # 避免重复打印同一错误
+        previous_time = time.time()
 
         while self.running:
-            # 处理摄像头切换请求
             if self._camera_request is not None:
                 self._perform_camera_switch(self._camera_request)
 
@@ -381,75 +369,36 @@ class VideoWorker(QThread):
                 self.msleep(30)
                 continue
 
-            # ★ 本地视频帧率控制：记录每帧开始时间，用于后续限速
             if self.is_video_file:
                 frame_start = time.time()
 
             ret, frame = self.cap.read()
             if not ret:
-                if self.is_video_file:
-                    # ★ 视频播完自动循环：重置到第 0 帧，无限循环测试
+                if self.is_video_file and self.cap:
                     self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    self.msleep(5)  # 防止文件损坏时 CPU 空转
-                    continue
-                else:
                     self.msleep(5)
                     continue
-
-            try:
-                # 推理
-                results = self.model.track(
-                    frame,
-                    persist=True,
-                    tracker="bytetrack.yaml",
-                    conf=self.conf_val,
-                    iou=0.5,
-                    classes=[0]
-                )
-            except Exception as e:
-                if not _error_flag:
-                    self._log(lambda log: log.error(f"[追踪] model.track 异常: {e}"))
-                    _error_flag = True
-                self.msleep(30)
+                self.msleep(5)
                 continue
 
-            try:
-                fall_score = self._fall_detection_logic(results)
-            except Exception as e:
-                if not _error_flag:
-                    self._log(lambda log: log.error(f"[分析] fall_detection 异常: {e}"))
-                    _error_flag = True
-                fall_score = 0.0
-
+            results = self._predict(frame)
+            fall_score = self._fall_detection_logic(results) if results else 0.0
             self.fall_history.append(fall_score)
 
             try:
-                # 创建带检测框的标注图像（在紧急处理前）
                 annotated_frame = results[0].plot() if results else frame
-            except Exception as e:
-                if not _error_flag:
-                    self._log(lambda log: log.error(f"[绘图] results.plot 异常: {e}"))
-                    _error_flag = True
+            except Exception:
                 annotated_frame = frame
 
-            # 平滑触发(最近10帧平均>0.5，且非交互状态)
             if not self.is_interacting and len(self.fall_history) >= 10:
                 if sum(self.fall_history) / len(self.fall_history) > 0.5:
                     self.is_interacting = True
                     self.pre_alarm_signal.emit()
                     threading.Thread(target=self.handle_emergency, args=(annotated_frame,), daemon=True).start()
 
-            # 发送图像给 GUI
-            try:
-                curr_time = self._emit_frame(annotated_frame, prev_time, fall_score)
-            except Exception as e:
-                if not _error_flag:
-                    self._log(lambda log: log.error(f"[UI] emit_frame 异常: {e}"))
-                    _error_flag = True
-                curr_time = time.time()
-            prev_time = curr_time
+            current_time = self._emit_frame(annotated_frame, previous_time, fall_score)
+            previous_time = current_time
 
-            # ★ 本地视频帧率控制：模拟真实摄像头播放速度，防止光速播放
             if self.is_video_file and self.source_fps:
                 elapsed = time.time() - frame_start
                 sleep_time = (1.0 / self.source_fps) - elapsed
@@ -463,14 +412,13 @@ class VideoWorker(QThread):
 
     def _emit_frame(self, frame, prev_time, fall_score):
         rgb_img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        h, w, ch = rgb_img.shape
-        bytes_per_line = int(ch) * int(w)
-        qt_img = QImage(rgb_img.data, w, h, bytes_per_line, QImage.Format_RGB888)
-        curr_time = time.time()
-        fps = float(1.0 / (curr_time - prev_time) if (curr_time - prev_time) > 0 else 0.0)
-        is_fall = bool(fall_score > 0.5)
-        self.change_pixmap_signal.emit(qt_img, is_fall, fps)
-        return curr_time
+        height, width, channels = rgb_img.shape
+        bytes_per_line = channels * width
+        qt_img = QImage(rgb_img.data, width, height, bytes_per_line, QImage.Format_RGB888)
+        current_time = time.time()
+        fps = 1.0 / (current_time - prev_time) if current_time > prev_time else 0.0
+        self.change_pixmap_signal.emit(qt_img, fall_score > 0.5, float(fps))
+        return current_time
 
     def stop(self):
         self.running = False
